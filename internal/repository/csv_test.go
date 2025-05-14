@@ -6,9 +6,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
-	"github.com/Ceesaxp/cocktail-bot/internal/repository"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/repository"
 )
 
 func TestCSVRepository(t *testing.T) {

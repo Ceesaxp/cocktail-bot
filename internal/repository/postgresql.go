@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
@@ -57,7 +57,7 @@ func (r *PostgresRepository) FindByEmail(ctx context.Context, email string) (*do
 
 	var row *sql.Row
 	var err error
-	
+
 	// Use context with timeout to handle database unavailability
 	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()

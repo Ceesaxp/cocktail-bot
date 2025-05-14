@@ -1,0 +1,26 @@
+# Cocktail Bot Configuration Example
+# Generated on 2025-05-14 20:15:21
+
+# Log level (debug, info, warn, error)
+log_level: info
+
+# Telegram settings
+telegram:
+  # Bot token (get from BotFather)
+  token: "YOUR_TELEGRAM_BOT_TOKEN"
+  # Bot username
+  user: "your_bot_username"
+
+# Database settings
+database:
+  # Database type (csv, sqlite, googlesheet, postgresql, mysql, mongodb)
+  type: "csv"
+  # Connection string or path
+  connection_string: "./data/users.csv"
+
+# Rate limiting settings
+rate_limiting:
+  # Maximum requests per minute per user
+  requests_per_minute: 10
+  # Maximum requests per hour per user
+  requests_per_hour: 100

@@ -2,22 +2,21 @@ package service
 
 import (
 	"context"
-	"strings"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/config"
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
-	"github.com/Ceesaxp/cocktail-bot/internal/repository"
-	"github.com/Ceesaxp/cocktail-bot/internal/ratelimit"
-	"github.com/Ceesaxp/cocktail-bot/internal/utils"
+	"github.com/ceesaxp/cocktail-bot/internal/config"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/ratelimit"
+	"github.com/ceesaxp/cocktail-bot/internal/repository"
+	"github.com/ceesaxp/cocktail-bot/internal/utils"
 )
 
 // Service handles business logic for the bot
 type Service struct {
-	repo      domain.Repository
-	limiter   *ratelimit.Limiter
-	logger    *logger.Logger
+	repo    domain.Repository
+	limiter *ratelimit.Limiter
+	logger  *logger.Logger
 }
 
 // New creates a new service instance
@@ -32,9 +31,9 @@ func New(ctx context.Context, cfg *config.Config, logger *logger.Logger) (*Servi
 	limiter := ratelimit.New(cfg.RateLimiting.RequestsPerMinute, cfg.RateLimiting.RequestsPerHour)
 
 	return &Service{
-		repo:      repo,
-		limiter:   limiter,
-		logger:    logger,
+		repo:    repo,
+		limiter: limiter,
+		logger:  logger,
 	}, nil
 }
 

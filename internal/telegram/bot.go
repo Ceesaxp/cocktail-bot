@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
-	"github.com/Ceesaxp/cocktail-bot/internal/service"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/service"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 

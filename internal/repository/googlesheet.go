@@ -12,8 +12,8 @@ import (
 	"sync"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	"golang.org/x/oauth2/google"
 	"google.golang.org/api/option"
 	"google.golang.org/api/sheets/v4"

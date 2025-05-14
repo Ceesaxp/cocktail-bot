@@ -1,0 +1,26 @@
+# Cocktail Bot Configuration Example
+# Make a copy of this file as config.yaml and update the values
+
+# Log level (debug, info, warn, error)
+log_level: info
+
+# Telegram settings
+telegram:
+  # Bot token (get from BotFather)
+  token: "8099671361:AAHmiycnEk41vuD9he4RzmuiGaXAmogg-PE"
+  # Bot username
+  user: "cocktail_redemption_bot"
+
+# Database settings
+database:
+  # Database type (csv, sqlite, googlesheet, postgresql, mysql, mongodb)
+  type: "csv"
+  # Connection string or path
+  connection_string: "./data/users.csv"
+
+# Rate limiting settings
+rate_limiting:
+  # Maximum requests per minute per user
+  requests_per_minute: 10
+  # Maximum requests per hour per user
+  requests_per_hour: 100

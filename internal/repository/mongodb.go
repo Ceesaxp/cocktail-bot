@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"

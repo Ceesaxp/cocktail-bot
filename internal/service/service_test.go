@@ -5,10 +5,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/config"
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
-	"github.com/Ceesaxp/cocktail-bot/internal/service"
+	"github.com/ceesaxp/cocktail-bot/internal/config"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/ratelimit"
+	"github.com/ceesaxp/cocktail-bot/internal/service"
 )
 
 // mockRepository is a mock implementation of domain.Repository
@@ -91,9 +92,9 @@ func TestCheckEmailStatus(t *testing.T) {
 
 	// Create service with mock repo
 	svc := &service.Service{
-		Repo:      mockRepo,
-		Limiter:   ratelimit.New(10, 100),
-		Logger:    l,
+		Repo:    mockRepo,
+		Limiter: ratelimit.New(10, 100),
+		Logger:  l,
 	}
 
 	// Test cases
@@ -167,9 +168,9 @@ func TestRedeemCocktail(t *testing.T) {
 
 	// Create service with mock repo
 	svc := &service.Service{
-		Repo:      mockRepo,
-		Limiter:   ratelimit.New(10, 100),
-		Logger:    l,
+		Repo:    mockRepo,
+		Limiter: ratelimit.New(10, 100),
+		Logger:  l,
 	}
 
 	ctx := context.Background()

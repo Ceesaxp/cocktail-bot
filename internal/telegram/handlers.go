@@ -3,10 +3,9 @@ package telegram
 import (
 	"context"
 	"fmt"
-	"strings"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/utils"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/utils"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -63,7 +62,7 @@ func (b *Bot) handleEmailCheck(message *tgbotapi.Message) {
 	case "unavailable":
 		b.sendMessage(message.Chat.ID, "Sorry, our system is temporarily unavailable. Please try again later.")
 	case "redeemed":
-		b.sendMessage(message.Chat.ID, fmt.Sprintf("Email found, but free cocktail already consumed on %s.", 
+		b.sendMessage(message.Chat.ID, fmt.Sprintf("Email found, but free cocktail already consumed on %s.",
 			user.AlreadyConsumed.Format("January 2, 2006")))
 	case "eligible":
 		b.sendEligibleMessage(message.Chat.ID)
@@ -113,7 +112,7 @@ func (b *Bot) handleRedemption(query *tgbotapi.CallbackQuery, email string) {
 		return
 	}
 
-	b.sendMessage(query.Message.Chat.ID, fmt.Sprintf("Enjoy your free cocktail! Redeemed on %s.", 
+	b.sendMessage(query.Message.Chat.ID, fmt.Sprintf("Enjoy your free cocktail! Redeemed on %s.",
 		redemptionTime.Format("January 2, 2006")))
 
 	// Remove cached email

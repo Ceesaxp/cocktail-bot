@@ -2,11 +2,13 @@ package telegram_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/telegram"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
 )
 
@@ -224,7 +226,7 @@ func TestBot(t *testing.T) {
 	}
 
 	// Test callback query (redeem)
-	mockSvc.status = "eligible"  // Reset status
+	mockSvc.status = "eligible" // Reset status
 	mockSvc.user = eligibleUser // Reset user
 	mockAPI.messagesSent = nil  // Clear previous messages
 

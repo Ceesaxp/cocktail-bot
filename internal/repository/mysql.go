@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/domain"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/domain"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	_ "github.com/go-sql-driver/mysql" // MySQL driver
 )
 

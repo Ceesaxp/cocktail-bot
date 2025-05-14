@@ -8,10 +8,10 @@ import (
 	"os/signal"
 	"syscall"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/config"
-	"github.com/Ceesaxp/cocktail-bot/internal/logger"
-	"github.com/Ceesaxp/cocktail-bot/internal/service"
-	"github.com/Ceesaxp/cocktail-bot/internal/telegram"
+	"github.com/ceesaxp/cocktail-bot/internal/config"
+	"github.com/ceesaxp/cocktail-bot/internal/logger"
+	"github.com/ceesaxp/cocktail-bot/internal/service"
+	"github.com/ceesaxp/cocktail-bot/internal/telegram"
 )
 
 func main() {

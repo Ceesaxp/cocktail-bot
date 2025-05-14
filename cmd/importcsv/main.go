@@ -8,7 +8,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/Ceesaxp/cocktail-bot/internal/utils"
+	"github.com/ceesaxp/cocktail-bot/internal/utils"
 )
 
 func main() {

@@ -47,7 +47,7 @@ func NewForTest(repo domain.Repository, limiter *ratelimit.Limiter, logger *logg
 }
 
 // CheckEmailStatus checks if an email exists in the database and if it has been redeemed
-func (s *Service) CheckEmailStatus(ctx context.Context, userID int64, email string) (status string, user *domain.User, err error) {
+func (s *Service) CheckEmailStatus(ctx any, userID int64, email string) (status string, user *domain.User, err error) {
 	// Apply rate limiting
 	if !s.limiter.Allow(userID) {
 		return "rate_limited", nil, nil
@@ -85,7 +85,7 @@ func (s *Service) CheckEmailStatus(ctx context.Context, userID int64, email stri
 }
 
 // RedeemCocktail marks a user as having redeemed their cocktail
-func (s *Service) RedeemCocktail(ctx context.Context, userID int64, email string) (time.Time, error) {
+func (s *Service) RedeemCocktail(ctx any, userID int64, email string) (time.Time, error) {
 	// Apply rate limiting (just to be extra safe, though the button should be gone)
 	if !s.limiter.Allow(userID) {
 		return time.Time{}, nil // No error because this is a rare edge case

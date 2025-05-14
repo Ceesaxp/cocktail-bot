@@ -23,7 +23,7 @@ func newMockRepository() *mockRepository {
 	}
 }
 
-func (r *mockRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
+func (r *mockRepository) FindByEmail(ctx any, email string) (*domain.User, error) {
 	user, exists := r.users[email]
 	if !exists {
 		return nil, domain.ErrUserNotFound
@@ -37,7 +37,7 @@ func (r *mockRepository) FindByEmail(ctx context.Context, email string) (*domain
 	return &userCopy, nil
 }
 
-func (r *mockRepository) UpdateUser(ctx context.Context, user *domain.User) error {
+func (r *mockRepository) UpdateUser(ctx any, user *domain.User) error {
 	_, exists := r.users[user.Email]
 	if !exists {
 		return domain.ErrUserNotFound
@@ -61,7 +61,7 @@ type mockRepositoryFactory struct {
 	repo *mockRepository
 }
 
-func (f *mockRepositoryFactory) NewRepository(ctx context.Context, cfg config.DatabaseConfig, logger *logger.Logger) (domain.Repository, error) {
+func (f *mockRepositoryFactory) NewRepository(ctx any, cfg config.DatabaseConfig, logger *logger.Logger) (domain.Repository, error) {
 	return f.repo, nil
 }
 
@@ -90,12 +90,8 @@ func TestCheckEmailStatus(t *testing.T) {
 	// Create logger
 	l := logger.New("info")
 
-	// Create service with mock repo
-	svc := &service.Service{
-		Repo:    mockRepo,
-		Limiter: ratelimit.New(10, 100),
-		Logger:  l,
-	}
+	// Create a test service
+	svc := service.NewForTest(mockRepo, ratelimit.New(10, 100), l)
 
 	// Test cases
 	testCases := []struct {
@@ -109,6 +105,7 @@ func TestCheckEmailStatus(t *testing.T) {
 		{"Case-insensitive", "USER1@EXAMPLE.COM", "eligible"},
 	}
 
+	// Using any as context
 	ctx := context.Background()
 
 	for _, tc := range testCases {
@@ -166,22 +163,19 @@ func TestRedeemCocktail(t *testing.T) {
 	// Create logger
 	l := logger.New("info")
 
-	// Create service with mock repo
-	svc := &service.Service{
-		Repo:    mockRepo,
-		Limiter: ratelimit.New(10, 100),
-		Logger:  l,
-	}
+	// Create a test service
+	svc := service.NewForTest(mockRepo, ratelimit.New(10, 100), l)
 
+	// Using any as context
 	ctx := context.Background()
 
 	// Test redeeming eligible user
-	redeemTime, err := svc.RedeemCocktail(ctx, 12345, "eligible@example.com")
+	redemptionTime, err := svc.RedeemCocktail(ctx, 12345, "eligible@example.com")
 	if err != nil {
 		t.Errorf("Failed to redeem eligible user: %v", err)
 	}
 
-	if redeemTime.IsZero() {
+	if redemptionTime.IsZero() {
 		t.Errorf("Expected non-zero redemption time")
 	}
 
@@ -201,8 +195,11 @@ func TestRedeemCocktail(t *testing.T) {
 		t.Errorf("Failed to redeem already redeemed user: %v", err)
 	}
 
+	// Fix the comparison - we don't want to compare with redemption time from the first test
+	// but rather with the original redeemTime
 	if oldRedeemTime.Format(time.RFC3339) != redeemTime.Format(time.RFC3339) {
-		t.Errorf("Expected original redemption time, got a different time")
+		t.Errorf("Expected original redemption time %s, got %s", 
+			redeemTime.Format(time.RFC3339), oldRedeemTime.Format(time.RFC3339))
 	}
 
 	// Test redeeming non-existent user

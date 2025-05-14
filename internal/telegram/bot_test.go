@@ -1,11 +1,11 @@
 package telegram_test
 
 import (
-	"context"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/ceesaxp/cocktail-bot/internal/config"
 	"github.com/ceesaxp/cocktail-bot/internal/domain"
 	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	"github.com/ceesaxp/cocktail-bot/internal/telegram"
@@ -19,11 +19,11 @@ type mockService struct {
 	redeemError error
 }
 
-func (s *mockService) CheckEmailStatus(ctx context.Context, userID int64, email string) (string, *domain.User, error) {
+func (s *mockService) CheckEmailStatus(ctx any, userID int64, email string) (string, *domain.User, error) {
 	return s.status, s.user, nil
 }
 
-func (s *mockService) RedeemCocktail(ctx context.Context, userID int64, email string) (time.Time, error) {
+func (s *mockService) RedeemCocktail(ctx any, userID int64, email string) (time.Time, error) {
 	if s.redeemError != nil {
 		return time.Time{}, s.redeemError
 	}
@@ -33,6 +33,9 @@ func (s *mockService) RedeemCocktail(ctx context.Context, userID int64, email st
 func (s *mockService) Close() error {
 	return nil
 }
+
+// Ensure mockService implements the ServiceInterface
+var _ telegram.ServiceInterface = &mockService{}
 
 // mockBotAPI is a mock of the Telegram Bot API
 type mockBotAPI struct {
@@ -55,6 +58,9 @@ func newMockBotAPI() *mockBotAPI {
 		receivingUpdates: false,
 	}
 }
+
+// Ensure mockBotAPI implements the BotAPI interface
+var _ telegram.BotAPI = &mockBotAPI{}
 
 func (m *mockBotAPI) Send(c tgbotapi.Chattable) (tgbotapi.Message, error) {
 	switch v := c.(type) {
@@ -121,8 +127,23 @@ func TestBot(t *testing.T) {
 	// Create logger
 	l := logger.New("info")
 
+	// Create mock config and mock translator
+	cfg := &config.Config{}
+	
 	// Create the bot
-	bot := telegram.New(mockAPI, mockSvc, l)
+	bot := telegram.New(mockAPI, mockSvc, l, cfg)
+	
+	// Override translations for testing
+	bot.SetTranslations(map[string]string{
+		"welcome": "Welcome to the Cocktail Bot! Send your email to check if you're eligible for a free cocktail.",
+		"invalid_email": "That doesn't look like a valid email address. Please send a properly formatted email (e.g., example@domain.com).",
+		"email_not_found": "Email is not in database.",
+		"eligible": "Email found! You're eligible for a free cocktail.",
+		"already_redeemed": "Email found, but free cocktail already consumed on January 1, 2006.",
+		"redemption_success": "Enjoy your free cocktail! Redeemed on January 1, 2006.",
+		"button_redeem": "Get Cocktail",
+		"button_skip": "Skip",
+	})
 
 	// Test start command
 	bot.HandleCommand(&tgbotapi.Message{

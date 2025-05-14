@@ -4,6 +4,8 @@ import (
 	"fmt"
 	"sync"
 
+	"github.com/ceesaxp/cocktail-bot/internal/config"
+	"github.com/ceesaxp/cocktail-bot/internal/i18n"
 	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	"github.com/ceesaxp/cocktail-bot/internal/service"
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api/v5"
@@ -17,16 +19,39 @@ type Bot struct {
 	running    bool
 	waitGroup  sync.WaitGroup
 	stopCh     chan struct{}
-	emailCache map[int64]string // Map of userID -> last email checked
+	emailCache map[int64]string       // Map of userID -> last email checked
+	translator *i18n.Translator       // Translator for multi-language support
+	userLangs  map[int64]string       // Map of userID -> preferred language
 }
 
-// New creates a new Telegram bot
-func New(token string, service *service.Service, logger *logger.Logger) (*Bot, error) {
+// New creates a new Telegram bot with the provided API and service
+func New(api tgbotapi.BotAPIInterface, service interface{}, logger *logger.Logger, cfg *config.Config) *Bot {
+	// Create translator with config settings
+	translator := i18n.NewWithConfig(cfg)
+	i18n.LoadDefaultTranslations(translator)
+	
+	return &Bot{
+		api:        api,
+		service:    service,
+		logger:     logger,
+		stopCh:     make(chan struct{}),
+		emailCache: make(map[int64]string),
+		translator: translator,
+		userLangs:  make(map[int64]string),
+	}
+}
+
+// NewFromToken creates a new Telegram bot from a token
+func NewFromToken(token string, service *service.Service, logger *logger.Logger, cfg *config.Config) (*Bot, error) {
 	// Create bot API
 	api, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create Telegram bot: %w", err)
 	}
+
+	// Create translator with config settings
+	translator := i18n.NewWithConfig(cfg)
+	i18n.LoadDefaultTranslations(translator)
 
 	return &Bot{
 		api:        api,
@@ -34,6 +59,8 @@ func New(token string, service *service.Service, logger *logger.Logger) (*Bot, e
 		logger:     logger,
 		stopCh:     make(chan struct{}),
 		emailCache: make(map[int64]string),
+		translator: translator,
+		userLangs:  make(map[int64]string),
 	}, nil
 }
 
@@ -101,6 +128,13 @@ func (b *Bot) handleUpdate(update tgbotapi.Update) {
 		}
 	}()
 
+	// Detect language from user if applicable
+	if update.Message != nil && update.Message.From != nil {
+		b.detectUserLanguage(update.Message.From)
+	} else if update.CallbackQuery != nil && update.CallbackQuery.From != nil {
+		b.detectUserLanguage(update.CallbackQuery.From)
+	}
+
 	if update.Message != nil {
 		b.handleMessage(update.Message)
 	} else if update.CallbackQuery != nil {
@@ -115,4 +149,49 @@ func (b *Bot) sendMessage(chatID int64, text string) {
 	if err != nil {
 		b.logger.Error("Error sending message", "chat_id", chatID, "error", err)
 	}
+}
+
+// getUserLanguage gets the user's preferred language
+func (b *Bot) getUserLanguage(userID int64) string {
+	if lang, ok := b.userLangs[userID]; ok {
+		return lang
+	}
+	// Return the default language from translator's fallback
+	return b.translator.GetFallbackLanguage()
+}
+
+// detectUserLanguage attempts to detect user's language from Telegram
+// and stores it if not already set
+func (b *Bot) detectUserLanguage(user *tgbotapi.User) {
+	if user == nil || user.LanguageCode == "" {
+		return
+	}
+	
+	// Only detect if language not already set
+	if _, exists := b.userLangs[user.ID]; !exists {
+		detectedLang := b.detectLanguage(user.LanguageCode)
+		b.setUserLanguage(user.ID, detectedLang)
+	}
+}
+
+// setUserLanguage sets the user's preferred language
+func (b *Bot) setUserLanguage(userID int64, lang string) {
+	b.userLangs[userID] = lang
+}
+
+// detectLanguage attempts to detect the user's language from Telegram
+func (b *Bot) detectLanguage(tgLangCode string) string {
+	return b.translator.DetectLanguage(tgLangCode)
+}
+
+// translate translates a message key for a specific user
+func (b *Bot) translate(userID int64, key string, args ...string) string {
+	lang := b.getUserLanguage(userID)
+	return b.translator.T(lang, key, args...)
+}
+
+// sendTranslated sends a translated message to a chat
+func (b *Bot) sendTranslated(chatID int64, userID int64, key string, args ...string) {
+	text := b.translate(userID, key, args...)
+	b.sendMessage(chatID, text)
 }

@@ -24,3 +24,16 @@ rate_limiting:
   requests_per_minute: 10
   # Maximum requests per hour per user
   requests_per_hour: 100
+
+# Language settings
+language:
+  # Default language code (en, es, fr, de, ru, sr)
+  default_language: "en"
+  # List of enabled languages
+  enabled:
+    - "en"  # English
+    - "es"  # Spanish
+    - "fr"  # French
+    - "de"  # German
+    - "ru"  # Russian
+    # - "sr"  # Serbian (uncomment to enable)

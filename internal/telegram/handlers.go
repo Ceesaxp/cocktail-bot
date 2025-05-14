@@ -2,7 +2,7 @@ package telegram
 
 import (
 	"context"
-	"fmt"
+	"strings"
 
 	"github.com/ceesaxp/cocktail-bot/internal/domain"
 	"github.com/ceesaxp/cocktail-bot/internal/utils"
@@ -11,6 +11,7 @@ import (
 
 // handleMessage processes incoming messages
 func (b *Bot) handleMessage(message *tgbotapi.Message) {
+
 	if message.IsCommand() {
 		b.handleCommand(message)
 		return
@@ -23,18 +24,20 @@ func (b *Bot) handleMessage(message *tgbotapi.Message) {
 	}
 
 	// Respond with help message
-	b.sendMessage(message.Chat.ID, "That doesn't look like a valid email address. Please send a properly formatted email (e.g., example@domain.com).")
+	b.sendTranslated(message.Chat.ID, message.From.ID, "invalid_email")
 }
 
 // handleCommand handles bot commands
 func (b *Bot) handleCommand(message *tgbotapi.Message) {
 	switch message.Command() {
 	case "start":
-		b.sendMessage(message.Chat.ID, "Welcome to the Cocktail Bot! Send your email to check if you're eligible for a free cocktail.")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "welcome")
 	case "help":
-		b.sendHelpMessage(message.Chat.ID)
+		b.sendHelpMessage(message.Chat.ID, message.From.ID)
+	case "language":
+		b.sendLanguageOptions(message.Chat.ID)
 	default:
-		b.sendMessage(message.Chat.ID, "Unknown command. Please send your email to check eligibility or use /help for more information.")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "unknown_command")
 	}
 }
 
@@ -50,24 +53,24 @@ func (b *Bot) handleEmailCheck(message *tgbotapi.Message) {
 	status, user, err := b.service.CheckEmailStatus(ctx, int64(message.From.ID), email)
 	if err != nil {
 		b.logger.Error("Error checking email status", "email", email, "error", err)
-		b.sendMessage(message.Chat.ID, "Sorry, an error occurred. Please try again later.")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "error_occurred")
 		return
 	}
 
 	switch status {
 	case "rate_limited":
-		b.sendMessage(message.Chat.ID, "You've made too many requests. Please try again in a few minutes.")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "rate_limited")
 	case "not_found":
-		b.sendMessage(message.Chat.ID, "Email is not in database.")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "email_not_found")
 	case "unavailable":
-		b.sendMessage(message.Chat.ID, "Sorry, our system is temporarily unavailable. Please try again later.")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "system_unavailable")
 	case "redeemed":
-		b.sendMessage(message.Chat.ID, fmt.Sprintf("Email found, but free cocktail already consumed on %s.",
-			user.AlreadyConsumed.Format("January 2, 2006")))
+		dateStr := user.AlreadyConsumed.Format("January 2, 2006")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "already_redeemed", "date", dateStr)
 	case "eligible":
-		b.sendEligibleMessage(message.Chat.ID)
+		b.sendEligibleMessage(message.Chat.ID, message.From.ID)
 	default:
-		b.sendMessage(message.Chat.ID, "Sorry, an error occurred. Please try again later.")
+		b.sendTranslated(message.Chat.ID, message.From.ID, "error_occurred")
 	}
 }
 
@@ -77,10 +80,17 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 	callback := tgbotapi.NewCallback(query.ID, "")
 	b.api.Request(callback)
 
+	// Handle language selection
+	if strings.HasPrefix(query.Data, "lang_") {
+		lang := strings.TrimPrefix(query.Data, "lang_")
+		b.handleLanguageSelection(query, lang)
+		return
+	}
+
 	// Get cached email
 	email, ok := b.emailCache[query.From.ID]
 	if !ok {
-		b.sendMessage(query.Message.Chat.ID, "Sorry, I can't find your email. Please try again.")
+		b.sendTranslated(query.Message.Chat.ID, query.From.ID, "email_not_cached")
 		return
 	}
 
@@ -90,7 +100,7 @@ func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 	case "skip":
 		b.handleSkip(query)
 	default:
-		b.sendMessage(query.Message.Chat.ID, "Unknown action. Please try again.")
+		b.sendTranslated(query.Message.Chat.ID, query.From.ID, "error_occurred")
 	}
 
 	// Remove buttons from the original message
@@ -104,16 +114,16 @@ func (b *Bot) handleRedemption(query *tgbotapi.CallbackQuery, email string) {
 
 	if err != nil {
 		if err == domain.ErrDatabaseUnavailable {
-			b.sendMessage(query.Message.Chat.ID, "Sorry, our system is temporarily unavailable. Please try again later.")
+			b.sendTranslated(query.Message.Chat.ID, query.From.ID, "system_unavailable")
 		} else {
 			b.logger.Error("Error redeeming cocktail", "email", email, "error", err)
-			b.sendMessage(query.Message.Chat.ID, "Sorry, an error occurred. Please try again later.")
+			b.sendTranslated(query.Message.Chat.ID, query.From.ID, "error_occurred")
 		}
 		return
 	}
 
-	b.sendMessage(query.Message.Chat.ID, fmt.Sprintf("Enjoy your free cocktail! Redeemed on %s.",
-		redemptionTime.Format("January 2, 2006")))
+	dateStr := redemptionTime.Format("January 2, 2006")
+	b.sendTranslated(query.Message.Chat.ID, query.From.ID, "redemption_success", "date", dateStr)
 
 	// Remove cached email
 	delete(b.emailCache, query.From.ID)
@@ -121,41 +131,104 @@ func (b *Bot) handleRedemption(query *tgbotapi.CallbackQuery, email string) {
 
 // handleSkip processes skipping the cocktail redemption
 func (b *Bot) handleSkip(query *tgbotapi.CallbackQuery) {
-	b.sendMessage(query.Message.Chat.ID, "You've chosen to skip the cocktail redemption. You can check again later.")
+	b.sendTranslated(query.Message.Chat.ID, query.From.ID, "skip_redemption")
 
 	// Remove cached email
 	delete(b.emailCache, query.From.ID)
 }
 
 // sendEligibleMessage sends a message with redemption buttons
-func (b *Bot) sendEligibleMessage(chatID int64) {
+func (b *Bot) sendEligibleMessage(chatID int64, userID int64) {
+	redeemText := b.translate(userID, "button_redeem")
+	skipText := b.translate(userID, "button_skip")
+
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(
 		tgbotapi.NewInlineKeyboardRow(
-			tgbotapi.NewInlineKeyboardButtonData("Get Cocktail", "redeem"),
-			tgbotapi.NewInlineKeyboardButtonData("Skip", "skip"),
+			tgbotapi.NewInlineKeyboardButtonData(redeemText, "redeem"),
+			tgbotapi.NewInlineKeyboardButtonData(skipText, "skip"),
 		),
 	)
-	msg := tgbotapi.NewMessage(chatID, "Email found! You're eligible for a free cocktail.")
+
+	text := b.translate(userID, "eligible")
+	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = keyboard
 	b.api.Send(msg)
 }
 
 // sendHelpMessage sends help information
-func (b *Bot) sendHelpMessage(chatID int64) {
-	help := `Here's how to use the Cocktail Bot:
+func (b *Bot) sendHelpMessage(chatID int64, userID int64) {
+	helpText := b.translate(userID, "help_message")
+	b.sendMessage(chatID, helpText)
+}
 
-• Send your email address to check if you're eligible for a free cocktail
-• If eligible, you'll receive options to redeem or skip
-• Choose "Get Cocktail" to redeem your free drink
-• Each email can only be redeemed once
+// sendLanguageOptions sends a message with language selection buttons
+func (b *Bot) sendLanguageOptions(chatID int64) {
+	// Get available languages
+	languages := b.translator.GetAvailableLanguages()
 
-Commands:
-/start - Start the bot
-/help - Show this help message
+	// Create language selection keyboard
+	var rows [][]tgbotapi.InlineKeyboardButton
 
-Send an email address to begin!`
+	// Map language codes to readable names
+	langNames := map[string]string{
+		"en": "English",
+		"es": "Español",
+		"fr": "Français",
+		"de": "Deutsch",
+		"ru": "Русский",
+		"sr": "Српски",
+	}
 
-	b.sendMessage(chatID, help)
+	// Create buttons in groups of 2
+	var row []tgbotapi.InlineKeyboardButton
+	for i, lang := range languages {
+		name, ok := langNames[lang]
+		if !ok {
+			name = lang // Fallback to code if name not found
+		}
+
+		button := tgbotapi.NewInlineKeyboardButtonData(name, "lang_"+lang)
+		row = append(row, button)
+
+		// Add row after every 2 buttons or at the end
+		if (i+1)%2 == 0 || i == len(languages)-1 {
+			rows = append(rows, row)
+			row = []tgbotapi.InlineKeyboardButton{}
+		}
+	}
+
+	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
+	msg := tgbotapi.NewMessage(chatID, b.translate(0, "language_command"))
+	msg.ReplyMarkup = keyboard
+	b.api.Send(msg)
+}
+
+// handleLanguageSelection processes language selection from the user
+func (b *Bot) handleLanguageSelection(query *tgbotapi.CallbackQuery, lang string) {
+	// Check if language is supported
+	supported := false
+	for _, l := range b.translator.GetAvailableLanguages() {
+		if l == lang {
+			supported = true
+			break
+		}
+	}
+
+	if supported {
+		// Set user language
+		b.setUserLanguage(query.From.ID, lang)
+
+		// First set the language, then translate the confirmation message
+		// This ensures the message appears in the newly selected language
+		b.sendTranslated(query.Message.Chat.ID, query.From.ID, "language_set")
+	} else {
+		// Language not supported
+		// Show this message in their current language
+		b.sendTranslated(query.Message.Chat.ID, query.From.ID, "language_not_supported")
+	}
+
+	// Remove buttons from the original message
+	b.removeButtons(query.Message)
 }
 
 // removeButtons removes the inline keyboard from a message

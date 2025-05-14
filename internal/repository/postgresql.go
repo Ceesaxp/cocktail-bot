@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ceesaxp/cocktail-bot/internal/domain"
@@ -13,155 +12,163 @@ import (
 	_ "github.com/lib/pq" // PostgreSQL driver
 )
 
-// PostgresRepository implements a PostgreSQL-backed repository
 type PostgresRepository struct {
 	db     *sql.DB
 	logger *logger.Logger
 }
 
-// NewPostgresRepository creates a new PostgreSQL repository
-func NewPostgresRepository(ctx context.Context, connStr string, logger *logger.Logger) (*PostgresRepository, error) {
-	// Open database
-	db, err := sql.Open("postgres", connStr)
+func NewPostgresRepository(ctx any, connectionString string, logger *logger.Logger) (*PostgresRepository, error) {
+	if connectionString == "" {
+		return nil, errors.New("connection string cannot be empty")
+	}
+	if logger == nil {
+		return nil, errors.New("logger cannot be nil")
+	}
+
+	// Connect to PostgreSQL
+	db, err := sql.Open("postgres", connectionString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open PostgreSQL database: %w", err)
-	}
-
-	// Check connection
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to ping PostgreSQL database: %w", err)
-	}
-
-	repo := &PostgresRepository{
-		db:     db,
-		logger: logger,
-	}
-
-	// Initialize schema
-	if err := repo.initSchema(ctx); err != nil {
-		db.Close()
+		logger.Error("Failed to connect to PostgreSQL", "error", err)
 		return nil, err
 	}
 
-	return repo, nil
-}
-
-// FindByEmail finds a user by email (case-insensitive)
-func (r *PostgresRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
-	// Normalize email
-	email = strings.ToLower(email)
-
-	// Query user
-	query := `SELECT id, email, date_added, already_consumed FROM users WHERE LOWER(email) = $1`
-
-	var row *sql.Row
-	var err error
-
-	// Use context with timeout to handle database unavailability
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	row = r.db.QueryRowContext(ctxWithTimeout, query, email)
-
-	// Parse user
-	var id, retrievedEmail string
-	var dateAdded time.Time
-	var alreadyConsumedTime sql.NullTime
-
-	if err = row.Scan(&id, &retrievedEmail, &dateAdded, &alreadyConsumedTime); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrUserNotFound
-		}
-
-		// Check for connection issues
-		if errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "connection") {
-			r.logger.Error("Database connection issue", "error", err)
-			return nil, domain.ErrDatabaseUnavailable
-		}
-
-		r.logger.Error("Error querying user", "email", email, "error", err)
-		return nil, fmt.Errorf("failed to query user: %w", err)
+	// Check connection
+	err = db.PingContext(context.Background())
+	if err != nil {
+		db.Close()
+		logger.Error("Failed to ping PostgreSQL", "error", err)
+		return nil, domain.ErrDatabaseUnavailable
 	}
 
-	// Parse already consumed date
-	var alreadyConsumed *time.Time
-	if alreadyConsumedTime.Valid {
-		alreadyConsumed = &alreadyConsumedTime.Time
+	// Create table if it doesn't exist
+	_, err = db.ExecContext(context.Background(), `
+		CREATE TABLE IF NOT EXISTS users (
+			id VARCHAR(255) PRIMARY KEY,
+			email VARCHAR(255) UNIQUE NOT NULL,
+			date_added TIMESTAMP NOT NULL,
+			already_consumed TIMESTAMP
+		);
+		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+	`)
+	if err != nil {
+		db.Close()
+		logger.Error("Failed to create table", "error", err)
+		return nil, err
+	}
+
+	logger.Info("PostgreSQL Repository initialized")
+	return &PostgresRepository{
+		db:     db,
+		logger: logger,
+	}, nil
+}
+
+func (r *PostgresRepository) FindByEmail(ctx any, email string) (*domain.User, error) {
+	if email == "" {
+		return nil, errors.New("email cannot be empty")
+	}
+
+	r.logger.Debug("Looking for email in PostgreSQL", "email", email)
+
+	// Query for user
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	row := r.db.QueryRowContext(ctxWithTimeout, `
+		SELECT id, email, date_added, already_consumed
+		FROM users
+		WHERE email = $1
+	`, email)
+
+	// Parse result
+	var (
+		id                string
+		userEmail         string
+		dateAdded         time.Time
+		alreadyConsumedSQL sql.NullTime
+	)
+
+	err := row.Scan(&id, &userEmail, &dateAdded, &alreadyConsumedSQL)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Debug("User not found in PostgreSQL", "email", email)
+			return nil, domain.ErrUserNotFound
+		}
+		r.logger.Error("Error querying PostgreSQL", "error", err)
+		return nil, err
 	}
 
 	// Create user
 	user := &domain.User{
-		ID:              id,
-		Email:           retrievedEmail,
-		DateAdded:       dateAdded,
-		AlreadyConsumed: alreadyConsumed,
+		ID:        id,
+		Email:     userEmail,
+		DateAdded: dateAdded,
 	}
 
+	// Handle already consumed
+	if alreadyConsumedSQL.Valid {
+		consumed := alreadyConsumedSQL.Time
+		user.AlreadyConsumed = &consumed
+	}
+
+	r.logger.Debug("Found user in PostgreSQL", "email", email, "redeemed", user.IsRedeemed())
 	return user, nil
 }
 
-// UpdateUser updates a user in the repository
-func (r *PostgresRepository) UpdateUser(ctx context.Context, user *domain.User) error {
-	// Normalize email
-	email := strings.ToLower(user.Email)
+func (r *PostgresRepository) UpdateUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
 
-	// Update user
-	query := `UPDATE users SET already_consumed = $1 WHERE LOWER(email) = $2`
+	r.logger.Debug("Updating user in PostgreSQL", "email", user.Email)
 
-	// Use context with timeout to handle database unavailability
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// Prepare transaction
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	result, err := r.db.ExecContext(ctxWithTimeout, query, user.AlreadyConsumed, email)
+	tx, err := r.db.BeginTx(ctxWithTimeout, nil)
 	if err != nil {
-		// Check for connection issues
-		if errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "connection") {
-			r.logger.Error("Database connection issue", "error", err)
-			return domain.ErrDatabaseUnavailable
-		}
+		r.logger.Error("Failed to begin transaction", "error", err)
+		return err
+	}
+	defer tx.Rollback()
 
-		r.logger.Error("Error updating user", "email", email, "error", err)
-		return fmt.Errorf("failed to update user: %w", err)
+	// Use upsert (INSERT ON CONFLICT UPDATE) for atomic operation
+	query := `
+		INSERT INTO users (id, email, date_added, already_consumed)
+		VALUES ($1, $2, $3, $4)
+		ON CONFLICT (email)
+		DO UPDATE SET
+			id = EXCLUDED.id,
+			date_added = EXCLUDED.date_added,
+			already_consumed = EXCLUDED.already_consumed
+	`
+
+	var args []interface{}
+	if user.AlreadyConsumed != nil {
+		args = []interface{}{user.ID, user.Email, user.DateAdded, user.AlreadyConsumed}
+	} else {
+		args = []interface{}{user.ID, user.Email, user.DateAdded, nil}
 	}
 
-	// Check if user was found
-	rows, err := result.RowsAffected()
+	_, err = tx.ExecContext(ctxWithTimeout, query, args...)
 	if err != nil {
-		r.logger.Error("Error checking rows affected", "email", email, "error", err)
-		return fmt.Errorf("failed to check rows affected: %w", err)
+		r.logger.Error("Error upserting user", "error", err)
+		return fmt.Errorf("failed to upsert user: %w", err)
 	}
 
-	if rows == 0 {
-		return domain.ErrUserNotFound
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		r.logger.Error("Failed to commit transaction", "error", err)
+		return err
 	}
 
+	r.logger.Debug("User updated in PostgreSQL", "email", user.Email)
 	return nil
 }
 
-// Close closes the repository
 func (r *PostgresRepository) Close() error {
-	return r.db.Close()
-}
-
-// initSchema initializes the database schema
-func (r *PostgresRepository) initSchema(ctx context.Context) error {
-	// Create users table
-	query := `
-	CREATE TABLE IF NOT EXISTS users (
-		id TEXT PRIMARY KEY,
-		email TEXT NOT NULL UNIQUE,
-		date_added TIMESTAMP NOT NULL,
-		already_consumed TIMESTAMP
-	);
-	CREATE INDEX IF NOT EXISTS idx_email ON users (email);
-	`
-
-	_, err := r.db.ExecContext(ctx, query)
-	if err != nil {
-		r.logger.Error("Error initializing schema", "error", err)
-		return fmt.Errorf("failed to initialize schema: %w", err)
+	r.logger.Debug("Closing PostgreSQL repository")
+	if r.db != nil {
+		return r.db.Close()
 	}
-
 	return nil
 }

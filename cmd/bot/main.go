@@ -40,7 +40,7 @@ func main() {
 	}
 
 	// Initialize bot
-	bot, err := telegram.New(cfg.Telegram.Token, svc, l)
+	bot, err := telegram.NewFromToken(cfg.Telegram.Token, svc, l, cfg)
 	if err != nil {
 		l.Fatal("Failed to initialize Telegram bot", "error", err)
 	}

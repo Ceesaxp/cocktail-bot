@@ -37,6 +37,15 @@ func New(ctx context.Context, cfg *config.Config, logger *logger.Logger) (*Servi
 	}, nil
 }
 
+// NewForTest creates a new service instance for testing
+func NewForTest(repo domain.Repository, limiter *ratelimit.Limiter, logger *logger.Logger) *Service {
+	return &Service{
+		repo:    repo,
+		limiter: limiter,
+		logger:  logger,
+	}
+}
+
 // CheckEmailStatus checks if an email exists in the database and if it has been redeemed
 func (s *Service) CheckEmailStatus(ctx context.Context, userID int64, email string) (status string, user *domain.User, err error) {
 	// Apply rate limiting

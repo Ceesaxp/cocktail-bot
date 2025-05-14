@@ -5,160 +5,189 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/ceesaxp/cocktail-bot/internal/domain"
 	"github.com/ceesaxp/cocktail-bot/internal/logger"
-	_ "github.com/go-sql-driver/mysql" // MySQL driver
+	_ "github.com/go-sql-driver/mysql"
 )
 
-// MySQLRepository implements a MySQL-backed repository
 type MySQLRepository struct {
 	db     *sql.DB
 	logger *logger.Logger
 }
 
-// NewMySQLRepository creates a new MySQL repository
-func NewMySQLRepository(ctx context.Context, connStr string, logger *logger.Logger) (*MySQLRepository, error) {
-	// Open database
-	db, err := sql.Open("mysql", connStr)
+func NewMySQLRepository(ctx any, connectionString string, logger *logger.Logger) (*MySQLRepository, error) {
+	if connectionString == "" {
+		return nil, errors.New("connection string cannot be empty")
+	}
+	if logger == nil {
+		return nil, errors.New("logger cannot be nil")
+	}
+
+	// Connect to MySQL
+	db, err := sql.Open("mysql", connectionString)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open MySQL database: %w", err)
-	}
-
-	// Check connection
-	if err := db.PingContext(ctx); err != nil {
-		db.Close()
-		return nil, fmt.Errorf("failed to ping MySQL database: %w", err)
-	}
-
-	repo := &MySQLRepository{
-		db:     db,
-		logger: logger,
-	}
-
-	// Initialize schema
-	if err := repo.initSchema(ctx); err != nil {
-		db.Close()
+		logger.Error("Failed to connect to MySQL", "error", err)
 		return nil, err
 	}
 
-	return repo, nil
-}
-
-// FindByEmail finds a user by email (case-insensitive)
-func (r *MySQLRepository) FindByEmail(ctx context.Context, email string) (*domain.User, error) {
-	// Normalize email
-	email = strings.ToLower(email)
-
-	// Query user
-	query := `SELECT id, email, date_added, already_consumed FROM users WHERE LOWER(email) = ?`
-
-	// Use context with timeout
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
-	defer cancel()
-
-	row := r.db.QueryRowContext(ctxWithTimeout, query, email)
-
-	// Parse user
-	var id, retrievedEmail string
-	var dateAdded time.Time
-	var alreadyConsumedTime sql.NullTime
-
-	if err := row.Scan(&id, &retrievedEmail, &dateAdded, &alreadyConsumedTime); err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, domain.ErrUserNotFound
-		}
-
-		// Check for connection issues
-		if errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "connection") {
-			r.logger.Error("Database connection issue", "error", err)
-			return nil, domain.ErrDatabaseUnavailable
-		}
-
-		r.logger.Error("Error querying user", "email", email, "error", err)
-		return nil, fmt.Errorf("failed to query user: %w", err)
+	// Check connection
+	err = db.PingContext(context.Background())
+	if err != nil {
+		db.Close()
+		logger.Error("Failed to ping MySQL", "error", err)
+		return nil, domain.ErrDatabaseUnavailable
 	}
 
-	// Parse already consumed date
-	var alreadyConsumed *time.Time
-	if alreadyConsumedTime.Valid {
-		alreadyConsumed = &alreadyConsumedTime.Time
+	// Create table if it doesn't exist
+	_, err = db.ExecContext(context.Background(), `
+		CREATE TABLE IF NOT EXISTS users (
+			id VARCHAR(255) PRIMARY KEY,
+			email VARCHAR(255) UNIQUE NOT NULL,
+			date_added DATETIME NOT NULL,
+			already_consumed DATETIME
+		);
+		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
+	`)
+	if err != nil {
+		db.Close()
+		logger.Error("Failed to create table", "error", err)
+		return nil, err
+	}
+
+	logger.Info("MySQL Repository initialized")
+	return &MySQLRepository{
+		db:     db,
+		logger: logger,
+	}, nil
+}
+
+func (r *MySQLRepository) FindByEmail(ctx any, email string) (*domain.User, error) {
+	if email == "" {
+		return nil, errors.New("email cannot be empty")
+	}
+
+	r.logger.Debug("Looking for email in MySQL", "email", email)
+
+	// Query for user
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	row := r.db.QueryRowContext(ctxWithTimeout, `
+		SELECT id, email, date_added, already_consumed
+		FROM users
+		WHERE email = ?
+	`, email)
+
+	// Parse result
+	var (
+		id            string
+		userEmail     string
+		dateAdded     time.Time
+		alreadyConsumedSQL sql.NullTime
+	)
+
+	err := row.Scan(&id, &userEmail, &dateAdded, &alreadyConsumedSQL)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			r.logger.Debug("User not found in MySQL", "email", email)
+			return nil, domain.ErrUserNotFound
+		}
+		r.logger.Error("Error querying MySQL", "error", err)
+		return nil, err
 	}
 
 	// Create user
 	user := &domain.User{
-		ID:              id,
-		Email:           retrievedEmail,
-		DateAdded:       dateAdded,
-		AlreadyConsumed: alreadyConsumed,
+		ID:        id,
+		Email:     userEmail,
+		DateAdded: dateAdded,
 	}
 
+	// Handle already consumed
+	if alreadyConsumedSQL.Valid {
+		consumed := alreadyConsumedSQL.Time
+		user.AlreadyConsumed = &consumed
+	}
+
+	r.logger.Debug("Found user in MySQL", "email", email, "redeemed", user.IsRedeemed())
 	return user, nil
 }
 
-// UpdateUser updates a user in the repository
-func (r *MySQLRepository) UpdateUser(ctx context.Context, user *domain.User) error {
-	// Normalize email
-	email := strings.ToLower(user.Email)
+func (r *MySQLRepository) UpdateUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
 
-	// Update user
-	query := `UPDATE users SET already_consumed = ? WHERE LOWER(email) = ?`
+	r.logger.Debug("Updating user in MySQL", "email", user.Email)
 
-	// Use context with timeout
-	ctxWithTimeout, cancel := context.WithTimeout(ctx, 5*time.Second)
+	// Prepare transaction
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	result, err := r.db.ExecContext(ctxWithTimeout, query, user.AlreadyConsumed, email)
+	tx, err := r.db.BeginTx(ctxWithTimeout, nil)
 	if err != nil {
-		// Check for connection issues
-		if errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "connection") {
-			r.logger.Error("Database connection issue", "error", err)
-			return domain.ErrDatabaseUnavailable
+		r.logger.Error("Failed to begin transaction", "error", err)
+		return err
+	}
+	defer tx.Rollback()
+
+	// Check if user exists
+	var exists bool
+	err = tx.QueryRowContext(ctxWithTimeout, "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", user.Email).Scan(&exists)
+	if err != nil {
+		r.logger.Error("Error checking if user exists", "error", err)
+		return err
+	}
+
+	if exists {
+		// Update existing user
+		var query string
+		var args []interface{}
+
+		if user.AlreadyConsumed != nil {
+			query = "UPDATE users SET id = ?, date_added = ?, already_consumed = ? WHERE email = ?"
+			args = []interface{}{user.ID, user.DateAdded, user.AlreadyConsumed, user.Email}
+		} else {
+			query = "UPDATE users SET id = ?, date_added = ?, already_consumed = NULL WHERE email = ?"
+			args = []interface{}{user.ID, user.DateAdded, user.Email}
 		}
 
-		r.logger.Error("Error updating user", "email", email, "error", err)
+		_, err = tx.ExecContext(ctxWithTimeout, query, args...)
+	} else {
+		// Insert new user
+		var query string
+		var args []interface{}
+
+		if user.AlreadyConsumed != nil {
+			query = "INSERT INTO users(id, email, date_added, already_consumed) VALUES(?, ?, ?, ?)"
+			args = []interface{}{user.ID, user.Email, user.DateAdded, user.AlreadyConsumed}
+		} else {
+			query = "INSERT INTO users(id, email, date_added, already_consumed) VALUES(?, ?, ?, NULL)"
+			args = []interface{}{user.ID, user.Email, user.DateAdded}
+		}
+
+		_, err = tx.ExecContext(ctxWithTimeout, query, args...)
+	}
+
+	if err != nil {
+		r.logger.Error("Error updating user", "error", err)
 		return fmt.Errorf("failed to update user: %w", err)
 	}
 
-	// Check if user was found
-	rows, err := result.RowsAffected()
-	if err != nil {
-		r.logger.Error("Error checking rows affected", "email", email, "error", err)
-		return fmt.Errorf("failed to check rows affected: %w", err)
+	// Commit transaction
+	if err := tx.Commit(); err != nil {
+		r.logger.Error("Failed to commit transaction", "error", err)
+		return err
 	}
 
-	if rows == 0 {
-		return domain.ErrUserNotFound
-	}
-
+	r.logger.Debug("User updated in MySQL", "email", user.Email)
 	return nil
 }
 
-// Close closes the repository
 func (r *MySQLRepository) Close() error {
-	return r.db.Close()
-}
-
-// initSchema initializes the database schema
-func (r *MySQLRepository) initSchema(ctx context.Context) error {
-	// Create users table
-	query := `
-	CREATE TABLE IF NOT EXISTS users (
-		id VARCHAR(255) PRIMARY KEY,
-		email VARCHAR(255) NOT NULL UNIQUE,
-		date_added DATETIME NOT NULL,
-		already_consumed DATETIME NULL
-	);
-	CREATE INDEX IF NOT EXISTS idx_email ON users (email);
-	`
-
-	_, err := r.db.ExecContext(ctx, query)
-	if err != nil {
-		r.logger.Error("Error initializing schema", "error", err)
-		return fmt.Errorf("failed to initialize schema: %w", err)
+	r.logger.Debug("Closing MySQL repository")
+	if r.db != nil {
+		return r.db.Close()
 	}
-
 	return nil
 }

@@ -20,6 +20,7 @@ type Config struct {
 	Telegram    TelegramConfig `yaml:"telegram"`
 	Database    DatabaseConfig `yaml:"database"`
 	RateLimiting RateLimitConfig `yaml:"rate_limiting"`
+	Language    LanguageConfig `yaml:"language"`
 }
 
 // TelegramConfig holds Telegram bot configuration
@@ -40,6 +41,12 @@ type RateLimitConfig struct {
 	RequestsPerHour   int `yaml:"requests_per_hour"`
 }
 
+// LanguageConfig holds language settings
+type LanguageConfig struct {
+	DefaultLanguage string   `yaml:"default_language"`
+	Enabled         []string `yaml:"enabled"`
+}
+
 // New creates a new default configuration
 func New() *Config {
 	return &Config{
@@ -52,6 +59,10 @@ func New() *Config {
 		RateLimiting: RateLimitConfig{
 			RequestsPerMinute: 10,
 			RequestsPerHour:   100,
+		},
+		Language: LanguageConfig{
+			DefaultLanguage: "en",
+			Enabled:         []string{"en", "es", "fr", "de", "ru"},
 		},
 	}
 }
@@ -126,6 +137,22 @@ func loadFromEnvironment(cfg *Config) {
 			cfg.RateLimiting.RequestsPerHour = intValue
 		}
 	}
+
+	// Language
+	if value := os.Getenv(envPrefix + "LANGUAGE_DEFAULT"); value != "" {
+		cfg.Language.DefaultLanguage = value
+	}
+	if value := os.Getenv(envPrefix + "LANGUAGE_ENABLED"); value != "" {
+		languages := strings.Split(value, ",")
+		cfg.Language.Enabled = make([]string, 0, len(languages))
+		// Trim spaces from language codes and filter out empty strings
+		for _, lang := range languages {
+			trimmed := strings.TrimSpace(lang)
+			if trimmed != "" {
+				cfg.Language.Enabled = append(cfg.Language.Enabled, trimmed)
+			}
+		}
+	}
 }
 
 // GetConfigPath returns the config file path based on the provided path or default
@@ -171,13 +198,42 @@ func (c *Config) GetDatabaseType() string {
 	return strings.ToLower(c.Database.Type)
 }
 
+// GetDefaultLanguage returns the default language
+func (c *Config) GetDefaultLanguage() string {
+	if c.Language.DefaultLanguage == "" {
+		return "en"
+	}
+	return c.Language.DefaultLanguage
+}
+
+// GetEnabledLanguages returns the list of enabled languages
+func (c *Config) GetEnabledLanguages() []string {
+	if len(c.Language.Enabled) == 0 {
+		return []string{"en"}
+	}
+	// Make a copy to avoid potential modification of the original slice
+	result := make([]string, len(c.Language.Enabled))
+	copy(result, c.Language.Enabled)
+	return result
+}
+
+// IsLanguageEnabled checks if a specific language is enabled
+func (c *Config) IsLanguageEnabled(lang string) bool {
+	for _, l := range c.Language.Enabled {
+		if strings.EqualFold(l, lang) {
+			return true
+		}
+	}
+	return false
+}
+
 // SupportedDatabaseTypes returns a list of supported database types
 func SupportedDatabaseTypes() []string {
 	return []string{
 		"csv",
 		"sqlite",
 		"googlesheet",
-		"postgresql", 
+		"postgresql",
 		"mysql",
 		"mongodb",
 	}

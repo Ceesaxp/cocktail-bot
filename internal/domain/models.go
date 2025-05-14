@@ -1,14 +1,7 @@
 package domain
 
 import (
-	"errors"
 	"time"
-)
-
-// Define sentinel errors for the domain
-var (
-	ErrUserNotFound        = errors.New("User email is not found in database")
-	ErrDatabaseUnavailable = errors.New("Database is not available, try later")
 )
 
 type User struct {

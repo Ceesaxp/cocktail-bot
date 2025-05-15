@@ -87,7 +87,12 @@ mkdir -p ./data
 chmod 777 ./data
 
 # Run the container
-docker run -v $(pwd)/config.yaml:/app/config.yaml -v $(pwd)/data:/app/data -p 8080:8080 cocktail-bot
+docker run \
+  -v $(pwd)/config.yaml:/app/config.yaml \
+  -v $(pwd)/data:/app/data \
+  -p 8080:8080 \
+  -e COCKTAILBOT_API_TOKENS="token1,token2,token3" \
+  cocktail-bot
 ```
 
 > **Note**: The Docker image includes SQLite support enabled through CGO.

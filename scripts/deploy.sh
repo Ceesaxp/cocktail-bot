@@ -20,17 +20,18 @@ log "Creating application directories"
 sudo mkdir -p $APP_DIR
 sudo mkdir -p $DATA_DIR
 
-# Create API tokens file if it doesn't exist
-API_TOKENS_FILE="$APP_DIR/api_tokens.yaml"
-if [ ! -f "$API_TOKENS_FILE" ]; then
-  log "API tokens file not found, creating one"
-  TOKEN=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9_-')
-  cat > /tmp/api_tokens.yaml << EOF
-auth_tokens:
-    - $TOKEN
-EOF
-  sudo mv /tmp/api_tokens.yaml $API_TOKENS_FILE
-  log "API token generated: $TOKEN"
+# Generate API token if needed
+API_TOKEN=""
+if [ -f "$APP_DIR/api_tokens.yaml" ]; then
+  # Try to read existing token from file
+  API_TOKEN=$(sudo grep -oP '(?<=- )[A-Za-z0-9_-]+' "$APP_DIR/api_tokens.yaml" | head -1 || echo "")
+fi
+
+# Generate a new token if none exists
+if [ -z "$API_TOKEN" ]; then
+  log "Generating new API token"
+  API_TOKEN=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9_-')
+  log "API token generated: $API_TOKEN"
 fi
 
 # Check if config file exists
@@ -71,13 +72,14 @@ Type=simple
 Restart=always
 RestartSec=10
 Environment="DOCKER_IMAGE=$DOCKER_IMAGE"
+Environment="API_TOKEN=$API_TOKEN"
 ExecStartPre=-/usr/bin/docker pull \${DOCKER_IMAGE}
 ExecStartPre=-/usr/bin/docker rm -f $SERVICE_NAME
 ExecStart=/usr/bin/docker run --name $SERVICE_NAME \
   -v $CONFIG_FILE:/app/config.yaml \
   -v $DATA_DIR:/app/data \
-  -v $API_TOKENS_FILE:/app/api_tokens.yaml \
   -p 8080:8080 \
+  -e COCKTAILBOT_API_TOKENS=\${API_TOKEN} \
   --restart unless-stopped \
   \${DOCKER_IMAGE}
 ExecStop=/usr/bin/docker stop $SERVICE_NAME

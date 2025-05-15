@@ -27,8 +27,13 @@ if ! command -v jq &> /dev/null; then
     exit 1
 fi
 
-# Read token from token file
-if [ -f "$TOKEN_FILE" ]; then
+# First check if token is provided in environment variable
+if [ -n "$COCKTAILBOT_API_TOKENS" ]; then
+    # Use the first token if multiple are provided
+    TOKEN=$(echo "$COCKTAILBOT_API_TOKENS" | awk -F',' '{print $1}' | xargs)
+    echo -e "${GREEN}Using token from environment variable${NC}"
+# Otherwise read token from token file
+elif [ -f "$TOKEN_FILE" ]; then
     # Try to parse token using grep and awk
     TOKEN=$(grep -m 1 "auth_tokens:" -A 1 "$TOKEN_FILE" | tail -n 1 | awk -F'"' '{print $2}')
     if [ -z "$TOKEN" ]; then

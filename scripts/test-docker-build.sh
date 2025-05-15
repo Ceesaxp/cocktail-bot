@@ -27,9 +27,14 @@ if ! grep -q "type: \"sqlite\"" config.yaml; then
   echo "⚠️    connection_string: \"/app/data/users.sqlite\""
 fi
 
+# Generate a test API token
+TEST_API_TOKEN=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9_-')
+echo "===> Generated test API token: $TEST_API_TOKEN"
+
 echo "===> Running container with SQLite database"
 docker run --rm -v "$(pwd)/test-data:/app/data" \
   -v "$(pwd)/config.yaml:/app/config.yaml" \
+  -e COCKTAILBOT_API_TOKENS="$TEST_API_TOKEN" \
   -p 8080:8080 \
   --name cocktail-bot-test \
   -d cocktail-bot:test

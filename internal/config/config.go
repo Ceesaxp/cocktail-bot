@@ -195,6 +195,20 @@ func loadFromEnvironment(cfg *Config) {
 			cfg.API.RateLimitPerHour = intValue
 		}
 	}
+	// Direct API tokens from environment variable (comma separated)
+	if value := os.Getenv(envPrefix + "API_TOKENS"); value != "" {
+		tokens := strings.Split(value, ",")
+		var filteredTokens []string
+		for _, token := range tokens {
+			token = strings.TrimSpace(token)
+			if token != "" {
+				filteredTokens = append(filteredTokens, token)
+			}
+		}
+		if len(filteredTokens) > 0 {
+			cfg.API.AuthTokens = filteredTokens
+		}
+	}
 }
 
 // GetConfigPath returns the config file path based on the provided path or default
@@ -276,20 +290,30 @@ func (c *Config) LoadAuthTokens() error {
 		return nil
 	}
 
-	// If tokens file is not specified, nothing to load
-	if c.API.TokensFile == "" {
+	// If we already have tokens from environment variables, use those
+	if len(c.API.AuthTokens) > 0 {
 		return nil
+	}
+
+	// If tokens file is not specified, try to create a default one
+	if c.API.TokensFile == "" {
+		// Default to api_tokens.yaml in the current directory
+		c.API.TokensFile = "api_tokens.yaml"
 	}
 
 	// Check if the file exists
 	if _, err := os.Stat(c.API.TokensFile); os.IsNotExist(err) {
-		return nil // File doesn't exist, not an error
+		// If the file doesn't exist and we're in a container, we don't treat this as an error
+		// because we might be using environment variables instead
+		return nil
 	}
 
-	// Read the file
+	// Try to read the file
 	data, err := os.ReadFile(c.API.TokensFile)
 	if err != nil {
-		return err
+		// If we can't read the file, it might not be mounted or accessible
+		// This is a warning but not necessarily an error
+		return nil
 	}
 
 	// Parse YAML into a temporary struct

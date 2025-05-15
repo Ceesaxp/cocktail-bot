@@ -181,9 +181,31 @@ api:
   rate_limit_per_hour: 300
 ```
 
-## API Tokens File Format
+## Authentication Methods
 
-The tokens file (`api_tokens.yaml`) uses the following format:
+There are two ways to configure API tokens:
+
+### 1. Environment Variable
+
+You can set API tokens directly through an environment variable:
+
+```bash
+# Set a single token
+export COCKTAILBOT_API_TOKENS="your-token-here"
+
+# Set multiple tokens (comma-separated)
+export COCKTAILBOT_API_TOKENS="token1,token2,token3"
+```
+
+In Docker, you can pass tokens via the `-e` flag:
+
+```bash
+docker run -e COCKTAILBOT_API_TOKENS="token1,token2,token3" ...
+```
+
+### 2. API Tokens File
+
+Alternatively, you can use a YAML file (`api_tokens.yaml`):
 
 ```yaml
 auth_tokens:
@@ -191,6 +213,8 @@ auth_tokens:
   - "token2_def456uvw"
   - "token3_ghi789rst"
 ```
+
+**Note:** Environment variables take precedence over the tokens file.
 
 ## Security Recommendations
 

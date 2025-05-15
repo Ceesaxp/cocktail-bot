@@ -57,14 +57,15 @@ Requires=docker.service
 Type=simple
 Restart=always
 RestartSec=10
-ExecStartPre=-/usr/bin/docker pull $DOCKER_IMAGE
+Environment="DOCKER_IMAGE=$DOCKER_IMAGE"
+ExecStartPre=-/usr/bin/docker pull \${DOCKER_IMAGE}
 ExecStartPre=-/usr/bin/docker rm -f $SERVICE_NAME
 ExecStart=/usr/bin/docker run --name $SERVICE_NAME \
   -v $CONFIG_FILE:/app/config.yaml \
   -v $DATA_DIR:/app/data \
   -p 8080:8080 \
   --restart unless-stopped \
-  $DOCKER_IMAGE
+  \${DOCKER_IMAGE}
 ExecStop=/usr/bin/docker stop $SERVICE_NAME
 User=root
 Group=root
@@ -83,8 +84,20 @@ sudo chmod -R 755 $APP_DIR
 sudo chmod -R 777 $DATA_DIR  # Ensure SQLite has write permissions
 
 # Pull latest image
-log "Pulling latest Docker image"
-sudo docker pull $DOCKER_IMAGE
+log "Pulling Docker image: $DOCKER_IMAGE"
+if ! sudo docker pull $DOCKER_IMAGE; then
+  log "Error pulling $DOCKER_IMAGE, checking for tagged images instead"
+  # Try to find the most recent tag if latest doesn't exist
+  LATEST_TAG=$(curl -s "https://hub.docker.com/v2/repositories/ceesaxp/cocktail-bot/tags/" | grep -o '"name":"[^"]*' | grep -v latest | sed 's/"name":"//g' | head -1)
+  if [ -n "$LATEST_TAG" ]; then
+    log "Found alternative tag: $LATEST_TAG, using it instead"
+    DOCKER_IMAGE="ceesaxp/cocktail-bot:$LATEST_TAG"
+    sudo docker pull $DOCKER_IMAGE
+  else
+    log "ERROR: Could not find any valid Docker image tag. Deployment failed."
+    exit 1
+  fi
+fi
 
 # Restart service
 log "Restarting service"

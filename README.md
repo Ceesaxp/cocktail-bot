@@ -171,6 +171,25 @@ The project uses GitHub Actions for continuous integration and deployment:
 2. **Build**: After successful tests, a Docker image is built and pushed to DockerHub.
 3. **CD**: Manual deployment to a Digital Ocean droplet can be triggered from the GitHub Actions interface.
 
+### Deployment Options
+
+There are several ways to deploy the application:
+
+1. **GitHub Actions Workflow**: Use the CI/CD pipeline for automated deployment
+   ```bash
+   # Triggered from the GitHub Actions interface
+   ```
+
+2. **Manual Docker Hub Push**: Build and push the image to Docker Hub
+   ```bash
+   ./scripts/push-docker-latest.sh
+   ```
+
+3. **Direct Deployment**: Build locally and deploy directly to server
+   ```bash
+   DEPLOY_USER=your_username DROPLET_IP=your_server_ip ./scripts/direct-deploy.sh
+   ```
+
 See the [Deployment Guide](docs/deployment.md) for detailed instructions.
 
 ## License

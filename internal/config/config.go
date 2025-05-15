@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -284,13 +285,21 @@ func (c *Config) IsLanguageEnabled(lang string) bool {
 }
 
 // LoadAuthTokens loads API authentication tokens from the configured tokens file
+// This is now a simple utility function that loads tokens from a file
+// but only if there are no tokens already configured
 func (c *Config) LoadAuthTokens() error {
 	// Skip if API is not enabled
 	if !c.API.Enabled {
 		return nil
 	}
 
-	// If tokens file is not specified, try to create a default one
+	// If we already have tokens from config.yaml or environment variables,
+	// we don't need to load from file
+	if len(c.API.AuthTokens) > 0 {
+		return nil
+	}
+
+	// If tokens file is not specified, use default
 	if c.API.TokensFile == "" {
 		// Default to api_tokens.yaml in the current directory
 		c.API.TokensFile = "api_tokens.yaml"
@@ -298,17 +307,13 @@ func (c *Config) LoadAuthTokens() error {
 
 	// Check if the file exists
 	if _, err := os.Stat(c.API.TokensFile); os.IsNotExist(err) {
-		// If the file doesn't exist, we don't treat this as an error
-		// because we might be using environment variables instead
-		return nil
+		return fmt.Errorf("tokens file does not exist: %s", c.API.TokensFile)
 	}
 
 	// Try to read the file
 	data, err := os.ReadFile(c.API.TokensFile)
 	if err != nil {
-		// If we can't read the file, it might not be mounted or accessible
-		// This is a warning but not necessarily an error
-		return nil
+		return fmt.Errorf("failed to read tokens file: %w", err)
 	}
 
 	// Parse YAML into a temporary struct
@@ -318,27 +323,12 @@ func (c *Config) LoadAuthTokens() error {
 
 	err = yaml.Unmarshal(data, &tokensConfig)
 	if err != nil {
-		return err
+		return fmt.Errorf("failed to parse tokens file: %w", err)
 	}
 
-	// If we have tokens from the file and no tokens from environment variables,
-	// or if we prefer file tokens over environment variables, use the file tokens
+	// Set tokens from file if we found any
 	if len(tokensConfig.AuthTokens) > 0 {
-		if len(c.API.AuthTokens) == 0 || os.Getenv(envPrefix+"PREFER_FILE_TOKENS") == "true" {
-			c.API.AuthTokens = tokensConfig.AuthTokens
-		} else {
-			// Merge tokens from file with existing tokens
-			tokenMap := make(map[string]bool)
-			for _, t := range c.API.AuthTokens {
-				tokenMap[t] = true
-			}
-
-			for _, t := range tokensConfig.AuthTokens {
-				if !tokenMap[t] {
-					c.API.AuthTokens = append(c.API.AuthTokens, t)
-				}
-			}
-		}
+		c.API.AuthTokens = tokensConfig.AuthTokens
 	}
 
 	return nil

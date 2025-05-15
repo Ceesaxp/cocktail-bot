@@ -17,8 +17,7 @@ services:
     networks:
       - cocktail-net
     environment:
-      - COCKTAILBOT_API_TOKENS=token_CBOxQFtZdqZFWUOuGU-j4I0HdzDHKr-5
-      - COCKTAILBOT_PREFER_FILE_TOKENS=true
+      - COCKTAILBOT_API_ENABLED=true
 
   # Uncomment this service if you want to use PostgreSQL as your database
   # postgres:

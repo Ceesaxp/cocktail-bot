@@ -46,12 +46,12 @@ Add the following secrets to your GitHub repository:
 
 3. Create the application directory:
    ```bash
-   sudo mkdir -p /opt/cocktail-bot/data
+   sudo mkdir -p /srv/cocktail-bot/data
    ```
 
 4. Create a configuration file:
    ```bash
-   sudo nano /opt/cocktail-bot/config.yaml
+   sudo nano /srv/cocktail-bot/config.yaml
    ```
 
    With the following content (replace with your values):
@@ -97,8 +97,8 @@ If you need to deploy manually without using the CI/CD pipeline:
    ```bash
    docker pull ceesaxp/cocktail-bot:latest
    docker run -d --name cocktail-bot \
-     -v /opt/cocktail-bot/config.yaml:/app/config.yaml \
-     -v /opt/cocktail-bot/data:/app/data \
+     -v /srv/cocktail-bot/config.yaml:/app/config.yaml \
+     -v /srv/cocktail-bot/data:/app/data \
      -p 8080:8080 \
      --restart unless-stopped \
      ceesaxp/cocktail-bot:latest

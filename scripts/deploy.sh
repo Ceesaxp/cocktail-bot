@@ -9,7 +9,7 @@ log() {
 }
 
 # Variables
-APP_DIR="/opt/cocktail-bot"
+APP_DIR="/srv/cocktail-bot"
 CONFIG_FILE="$APP_DIR/config.yaml"
 DATA_DIR="$APP_DIR/data"
 SERVICE_NAME="cocktail-bot"

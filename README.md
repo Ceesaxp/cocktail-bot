@@ -150,6 +150,17 @@ For detailed instructions on setting up Google Sheets integration, see [Google S
 - [API Documentation](docs/api.md) - RESTful API for programmatic email submission
 - [Google Sheets Integration](docs/googlesheets.md) - Guide for using Google Sheets as a database
 - [Design Document](docs/design-document.md) - Overall system design and architecture
+- [Deployment Guide](docs/deployment.md) - Instructions for deploying to production
+
+## CI/CD Pipeline
+
+The project uses GitHub Actions for continuous integration and deployment:
+
+1. **CI**: On every push and pull request, the pipeline runs tests and linting.
+2. **Build**: After successful tests, a Docker image is built and pushed to DockerHub.
+3. **CD**: Manual deployment to a Digital Ocean droplet can be triggered from the GitHub Actions interface.
+
+See the [Deployment Guide](docs/deployment.md) for detailed instructions.
 
 ## License
 

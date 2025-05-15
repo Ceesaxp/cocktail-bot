@@ -1,0 +1,48 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Development and IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+cocktail-bot
+token-generator
+
+# Data and configuration
+data/
+config.yaml
+*.csv
+*.db
+*.sqlite
+
+# Binary files
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Documentation
+docs/
+README.md
+
+# Testing
+*_test.go
+scripts/test-api.sh
+
+# CI/CD
+.github/
+
+# Miscellaneous
+*.log
+demo.log
+.DS_Store

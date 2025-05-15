@@ -99,6 +99,10 @@ if ! sudo docker pull $DOCKER_IMAGE; then
   fi
 fi
 
+# Delete any existing webhook before starting the bot
+log "Deleting any existing webhook"
+curl -s "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/deleteWebhook" > /dev/null
+
 # Restart service
 log "Restarting service"
 sudo systemctl restart $SERVICE_NAME
@@ -107,5 +111,10 @@ sudo systemctl enable $SERVICE_NAME
 # Check service status
 log "Service status:"
 sudo systemctl status $SERVICE_NAME --no-pager
+
+# Verify the service is running properly
+sleep 5
+log "Checking container logs"
+sudo docker logs cocktail-bot | tail -n 15
 
 log "Deployment completed successfully"

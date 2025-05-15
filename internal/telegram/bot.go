@@ -101,6 +101,17 @@ func (b *Bot) Start() error {
 	botAPI, ok := b.api.(*tgbotapi.BotAPI)
 	if ok {
 		b.logger.Info("Bot started", "username", botAPI.Self.UserName)
+		
+		// Delete any existing webhook to avoid conflicts with polling mode
+		_, err := botAPI.Request(tgbotapi.DeleteWebhookConfig{
+			DropPendingUpdates: true,
+		})
+		if err != nil {
+			b.logger.Error("Failed to delete webhook", "error", err)
+			// Continue anyway, it might work
+		} else {
+			b.logger.Info("Webhook deleted successfully")
+		}
 	} else {
 		b.logger.Info("Bot started")
 	}

@@ -65,7 +65,17 @@ if [ ! -f "$REMOTE_DIR/config.yaml" ]; then
   fi
 fi
 
-# Step 6: Load and run the image on the server
+# Step 6: Delete webhook before deployment
+log "Deleting Telegram webhook"
+TOKEN=$(grep -oP '(?<=token: ")[^"]*' config.yaml || echo "")
+if [ -n "$TOKEN" ]; then
+  curl -s "https://api.telegram.org/bot$TOKEN/deleteWebhook" > /dev/null
+  log "Webhook deleted successfully"
+else
+  warn "Couldn't extract Telegram token from config.yaml. Webhook deletion skipped."
+fi
+
+# Step 7: Load and run the image on the server
 log "Loading and running image on server"
 ssh $SERVER_USER@$SERVER_IP << EOF
   # Load the image
@@ -87,6 +97,7 @@ ssh $SERVER_USER@$SERVER_IP << EOF
   
   # Show logs
   echo "Container logs:"
+  sleep 5
   sudo docker logs cocktail-bot
 EOF
 

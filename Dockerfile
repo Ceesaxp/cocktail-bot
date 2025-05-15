@@ -15,6 +15,7 @@ COPY . .
 
 # Build the application with CGO enabled for SQLite support
 RUN CGO_ENABLED=1 go build -o cocktail-bot ./cmd/bot
+RUN go build -o token-generator ./cmd/token-generator
 
 # Create final lightweight image
 FROM alpine:3.18
@@ -27,6 +28,7 @@ WORKDIR /app
 
 # Copy the binary from builder
 COPY --from=builder /app/cocktail-bot /app/cocktail-bot
+COPY --from=builder /app/token-generator /app/token-generator
 
 # Create data directory
 RUN mkdir -p /app/data

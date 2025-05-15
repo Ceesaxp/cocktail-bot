@@ -10,6 +10,7 @@ services:
     volumes:
       - ./config.yaml:/app/config.yaml
       - ./data:/app/data
+      - ./api_tokens.yaml:/app/api_tokens.yaml
     ports:
       - "8080:8080"
     restart: unless-stopped

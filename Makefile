@@ -1,9 +1,10 @@
 # Makefile for Cocktail Bot
 
-.PHONY: build run docker docker-run clean test lint
+.PHONY: build run docker docker-run clean test lint generate-token api-test
 
 BIN_NAME=cocktail-bot
 DOCKER_IMAGE=cocktail-bot
+TOKEN_GEN=token-generator
 
 # Build the binary
 build:
@@ -27,7 +28,7 @@ docker-compose:
 
 # Clean build artifacts
 clean:
-	rm -f $(BIN_NAME)
+	rm -f $(BIN_NAME) $(TOKEN_GEN)
 
 # Run tests
 test:
@@ -41,6 +42,16 @@ lint:
 init:
 	mkdir -p data
 	cp config.yaml.example config.yaml
+	
+# Generate API token
+generate-token:
+	go build -o $(TOKEN_GEN) ./cmd/token-generator
+	./$(TOKEN_GEN)
+	
+# Test API endpoints
+api-test:
+	chmod +x ./scripts/test-api.sh
+	./scripts/test-api.sh
 
 # Generate a sample CSV file
 sample-csv:

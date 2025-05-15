@@ -39,7 +39,7 @@ go run cmd/demo-googlesheet/main.go -creds credentials.json -sheet-id YOUR_SPREA
 
 This will:
 - Create a tab named "Sheet1" if it doesn't exist
-- Add headers: ID, Email, Date Added, Already Consumed
+- Add headers: ID, Email, Date Added, Redeemed
 - Format the header row
 
 ### 5. Configure the Bot
@@ -77,7 +77,7 @@ The Google Sheet has the following columns:
 1. **ID**: A unique identifier for each user
 2. **Email**: The user's email address (used for lookups)
 3. **Date Added**: When the user was added to the sheet (RFC3339 format)
-4. **Already Consumed**: When the user redeemed their cocktail (RFC3339 format, empty if not redeemed)
+4. **Redeemed**: When the user redeemed their cocktail (RFC3339 format, empty if not redeemed)
 
 ## Troubleshooting
 

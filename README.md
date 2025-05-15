@@ -81,7 +81,11 @@ docker run -v $(pwd)/config.yaml:/app/config.yaml -v $(pwd)/data:/app/data cockt
 
 ## Database Options
 
+The Cocktail Bot supports multiple database backends, allowing you to choose the most appropriate storage solution for your deployment:
+
 ### CSV
+
+A simple file-based storage option, ideal for testing and small deployments.
 
 ```yaml
 database:
@@ -91,6 +95,8 @@ database:
 
 ### SQLite
 
+A lightweight, file-based SQL database requiring no separate server.
+
 ```yaml
 database:
   type: "sqlite"
@@ -98,6 +104,8 @@ database:
 ```
 
 ### PostgreSQL
+
+A powerful, open-source relational database for larger deployments.
 
 ```yaml
 database:
@@ -107,6 +115,8 @@ database:
 
 ### MySQL
 
+A popular open-source relational database.
+
 ```yaml
 database:
   type: "mysql"
@@ -114,6 +124,8 @@ database:
 ```
 
 ### MongoDB
+
+A NoSQL document database for flexible schema requirements.
 
 ```yaml
 database:
@@ -123,12 +135,22 @@ database:
 
 ### Google Sheets
 
+Store data in a Google Sheet, ideal for simple collaboration and visibility.
+
 ```yaml
 database:
   type: "googlesheet"
-  connection_string: "credentials.json:sheet_id:Sheet1!A1:D100"
+  connection_string: "credentials.json|sheet_id|Sheet1"
 ```
+
+For detailed instructions on setting up Google Sheets integration, see [Google Sheets Guide](docs/googlesheets.md)
+
+## Documentation
+
+- [API Documentation](docs/api.md) - RESTful API for programmatic email submission
+- [Google Sheets Integration](docs/googlesheets.md) - Guide for using Google Sheets as a database
+- [Design Document](docs/design-document.md) - Overall system design and architecture
 
 ## License
 
-MIT
+[MIT](LICENSE)

@@ -62,6 +62,7 @@ func New(cfg *config.Config, svc ServiceInterface, log *logger.Logger) (*Server,
 	if err := cfg.LoadAuthTokens(); err != nil {
 		return nil, fmt.Errorf("failed to load auth tokens: %w", err)
 	}
+	log.Info("Tokens loaded", fmt.Sprintf("%v", cfg.API.AuthTokens))
 
 	// Create a dedicated rate limiter for API requests
 	limiter := ratelimit.New(cfg.API.RateLimitPerMin, cfg.API.RateLimitPerHour)
@@ -231,10 +232,10 @@ func (s *Server) handleEmail(w http.ResponseWriter, r *http.Request) {
 
 	// Generate a new user with a unique ID
 	newUser := &domain.User{
-		ID:              GenerateUniqueID(),
-		Email:           email,
-		DateAdded:       time.Now(),
-		Redeemed: nil,
+		ID:        GenerateUniqueID(),
+		Email:     email,
+		DateAdded: time.Now(),
+		Redeemed:  nil,
 	}
 
 	// Store in database using service

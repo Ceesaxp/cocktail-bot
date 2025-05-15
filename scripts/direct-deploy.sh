@@ -49,6 +49,23 @@ docker save $IMAGE_NAME -o ./cocktail-bot-image.tar
 log "Preparing server directories"
 ssh $SERVER_USER@$SERVER_IP "sudo mkdir -p $REMOTE_DIR/data && sudo chmod 777 $REMOTE_DIR/data"
 
+# Create API tokens file if it doesn't exist
+log "Checking for API tokens file"
+if ! ssh $SERVER_USER@$SERVER_IP "test -f $REMOTE_DIR/api_tokens.yaml"; then
+  log "Creating API tokens file"
+  TOKEN=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9_-')
+  
+  cat > /tmp/api_tokens.yaml << EOF
+auth_tokens:
+    - $TOKEN
+EOF
+  
+  scp /tmp/api_tokens.yaml $SERVER_USER@$SERVER_IP:/tmp/api_tokens.yaml
+  ssh $SERVER_USER@$SERVER_IP "sudo mv /tmp/api_tokens.yaml $REMOTE_DIR/api_tokens.yaml"
+  log "API token generated: $TOKEN"
+  rm /tmp/api_tokens.yaml
+fi
+
 # Step 4: Copy the image to the server
 log "Copying image to server (this may take a while)"
 scp ./cocktail-bot-image.tar $SERVER_USER@$SERVER_IP:/tmp/cocktail-bot-image.tar
@@ -88,6 +105,7 @@ ssh $SERVER_USER@$SERVER_IP << EOF
   sudo docker run -d --name cocktail-bot \\
     -v $REMOTE_DIR/config.yaml:/app/config.yaml \\
     -v $REMOTE_DIR/data:/app/data \\
+    -v $REMOTE_DIR/api_tokens.yaml:/app/api_tokens.yaml \\
     -p 8080:8080 \\
     --restart unless-stopped \\
     $IMAGE_NAME

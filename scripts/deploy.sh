@@ -20,6 +20,19 @@ log "Creating application directories"
 sudo mkdir -p $APP_DIR
 sudo mkdir -p $DATA_DIR
 
+# Create API tokens file if it doesn't exist
+API_TOKENS_FILE="$APP_DIR/api_tokens.yaml"
+if [ ! -f "$API_TOKENS_FILE" ]; then
+  log "API tokens file not found, creating one"
+  TOKEN=$(openssl rand -base64 24 | tr -dc 'a-zA-Z0-9_-')
+  cat > /tmp/api_tokens.yaml << EOF
+auth_tokens:
+    - $TOKEN
+EOF
+  sudo mv /tmp/api_tokens.yaml $API_TOKENS_FILE
+  log "API token generated: $TOKEN"
+fi
+
 # Check if config file exists
 if [ ! -f "$CONFIG_FILE" ]; then
   log "Config file not found, creating from template"
@@ -63,6 +76,7 @@ ExecStartPre=-/usr/bin/docker rm -f $SERVICE_NAME
 ExecStart=/usr/bin/docker run --name $SERVICE_NAME \
   -v $CONFIG_FILE:/app/config.yaml \
   -v $DATA_DIR:/app/data \
+  -v $API_TOKENS_FILE:/app/api_tokens.yaml \
   -p 8080:8080 \
   --restart unless-stopped \
   \${DOCKER_IMAGE}

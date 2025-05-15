@@ -14,6 +14,8 @@ This bot allows users to check if their email address is eligible for a free coc
 - Interactive Telegram buttons for user decision
 - Configurable database backend
 - Comprehensive event logging
+- RESTful API for programmatic email submission
+- Secure API token authentication
 
 ## Requirements
 
@@ -188,6 +190,22 @@ There are several ways to deploy the application:
 3. **Direct Deployment**: Build locally and deploy directly to server
    ```bash
    DEPLOY_USER=your_username DROPLET_IP=your_server_ip ./scripts/direct-deploy.sh
+   ```
+
+### API Management
+
+The Cocktail Bot includes a RESTful API for programmatic email submission. You can manage API tokens with these scripts:
+
+1. **Manage API Tokens**: Add, remove, or list API tokens
+   ```bash
+   ./scripts/manage-api-tokens.sh add     # Add a new random token
+   ./scripts/manage-api-tokens.sh list    # List all tokens
+   ./scripts/manage-api-tokens.sh remove <token>  # Remove a token
+   ```
+
+2. **Test API**: Verify the API is working correctly
+   ```bash
+   ./scripts/test-api.sh [token] [email]  # Test with optional token and email
    ```
 
 See the [Deployment Guide](docs/deployment.md) for detailed instructions.

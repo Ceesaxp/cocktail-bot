@@ -12,7 +12,29 @@ All API requests require authentication using a bearer token.
 Authorization: Bearer YOUR_API_TOKEN
 ```
 
-API tokens can be generated using the token generator utility:
+API tokens can be managed using the token management script:
+
+```bash
+# List all tokens
+./scripts/manage-api-tokens.sh list
+
+# Add a new token (generates a random token if none provided)
+./scripts/manage-api-tokens.sh add
+
+# Add a specific token
+./scripts/manage-api-tokens.sh add your-token-here
+
+# Remove a token
+./scripts/manage-api-tokens.sh remove your-token-here
+
+# Reset tokens file with a single new random token
+./scripts/manage-api-tokens.sh reset
+
+# Initialize tokens file if it doesn't exist
+./scripts/manage-api-tokens.sh init
+```
+
+Alternatively, you can use the token generator utility:
 
 ```bash
 # Generate a single token

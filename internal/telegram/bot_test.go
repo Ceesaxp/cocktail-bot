@@ -104,7 +104,7 @@ func TestBot(t *testing.T) {
 		ID:              "1",
 		Email:           "eligible@example.com",
 		DateAdded:       now,
-		AlreadyConsumed: nil,
+		Redeemed: nil,
 	}
 
 	redeemTime := now.Add(-24 * time.Hour)
@@ -112,7 +112,7 @@ func TestBot(t *testing.T) {
 		ID:              "2",
 		Email:           "redeemed@example.com",
 		DateAdded:       now,
-		AlreadyConsumed: &redeemTime,
+		Redeemed: &redeemTime,
 	}
 
 	mockSvc := &mockService{

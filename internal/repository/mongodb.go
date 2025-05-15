@@ -21,10 +21,10 @@ type MongoDBRepository struct {
 
 // User represents a user document in MongoDB
 type mongoUser struct {
-	ID              string     `bson:"_id"`
-	Email           string     `bson:"email"`
-	DateAdded       time.Time  `bson:"date_added"`
-	AlreadyConsumed *time.Time `bson:"already_consumed,omitempty"`
+	ID        string     `bson:"_id"`
+	Email     string     `bson:"email"`
+	DateAdded time.Time  `bson:"date_added"`
+	Redeemed  *time.Time `bson:"redeemed,omitempty"`
 }
 
 // NewMongoDBRepository creates a new MongoDB repository
@@ -106,7 +106,7 @@ func (r *MongoDBRepository) FindByEmail(ctx any, email string) (*domain.User, er
 		ID:              result.ID,
 		Email:           result.Email,
 		DateAdded:       result.DateAdded,
-		AlreadyConsumed: result.AlreadyConsumed,
+		Redeemed: result.Redeemed,
 	}
 
 	r.logger.Debug("Found user in MongoDB", "email", email, "redeemed", user.IsRedeemed())
@@ -126,7 +126,7 @@ func (r *MongoDBRepository) UpdateUser(ctx any, user *domain.User) error {
 		ID:              user.ID,
 		Email:           user.Email,
 		DateAdded:       user.DateAdded,
-		AlreadyConsumed: user.AlreadyConsumed,
+		Redeemed: user.Redeemed,
 	}
 
 	// Use upsert to create or update

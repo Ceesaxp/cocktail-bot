@@ -46,7 +46,7 @@ func NewMySQLRepository(ctx any, connectionString string, logger *logger.Logger)
 			id VARCHAR(255) PRIMARY KEY,
 			email VARCHAR(255) UNIQUE NOT NULL,
 			date_added DATETIME NOT NULL,
-			already_consumed DATETIME
+			redeemed DATETIME
 		);
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 	`)
@@ -74,20 +74,20 @@ func (r *MySQLRepository) FindByEmail(ctx any, email string) (*domain.User, erro
 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	row := r.db.QueryRowContext(ctxWithTimeout, `
-		SELECT id, email, date_added, already_consumed
+		SELECT id, email, date_added, redeemed
 		FROM users
 		WHERE email = ?
 	`, email)
 
 	// Parse result
 	var (
-		id            string
-		userEmail     string
-		dateAdded     time.Time
-		alreadyConsumedSQL sql.NullTime
+		id          string
+		userEmail   string
+		dateAdded   time.Time
+		redeemedSQL sql.NullTime
 	)
 
-	err := row.Scan(&id, &userEmail, &dateAdded, &alreadyConsumedSQL)
+	err := row.Scan(&id, &userEmail, &dateAdded, &redeemedSQL)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Debug("User not found in MySQL", "email", email)
@@ -104,10 +104,10 @@ func (r *MySQLRepository) FindByEmail(ctx any, email string) (*domain.User, erro
 		DateAdded: dateAdded,
 	}
 
-	// Handle already consumed
-	if alreadyConsumedSQL.Valid {
-		consumed := alreadyConsumedSQL.Time
-		user.AlreadyConsumed = &consumed
+	// Handle redeemed
+	if redeemedSQL.Valid {
+		redeemed := redeemedSQL.Time
+		user.Redeemed = &redeemed
 	}
 
 	r.logger.Debug("Found user in MySQL", "email", email, "redeemed", user.IsRedeemed())
@@ -144,11 +144,11 @@ func (r *MySQLRepository) UpdateUser(ctx any, user *domain.User) error {
 		var query string
 		var args []interface{}
 
-		if user.AlreadyConsumed != nil {
-			query = "UPDATE users SET id = ?, date_added = ?, already_consumed = ? WHERE email = ?"
-			args = []interface{}{user.ID, user.DateAdded, user.AlreadyConsumed, user.Email}
+		if user.Redeemed != nil {
+			query = "UPDATE users SET id = ?, date_added = ?, redeemed = ? WHERE email = ?"
+			args = []interface{}{user.ID, user.DateAdded, user.Redeemed, user.Email}
 		} else {
-			query = "UPDATE users SET id = ?, date_added = ?, already_consumed = NULL WHERE email = ?"
+			query = "UPDATE users SET id = ?, date_added = ?, redeemed = NULL WHERE email = ?"
 			args = []interface{}{user.ID, user.DateAdded, user.Email}
 		}
 
@@ -158,11 +158,11 @@ func (r *MySQLRepository) UpdateUser(ctx any, user *domain.User) error {
 		var query string
 		var args []interface{}
 
-		if user.AlreadyConsumed != nil {
-			query = "INSERT INTO users(id, email, date_added, already_consumed) VALUES(?, ?, ?, ?)"
-			args = []interface{}{user.ID, user.Email, user.DateAdded, user.AlreadyConsumed}
+		if user.Redeemed != nil {
+			query = "INSERT INTO users(id, email, date_added, redeemed) VALUES(?, ?, ?, ?)"
+			args = []interface{}{user.ID, user.Email, user.DateAdded, user.Redeemed}
 		} else {
-			query = "INSERT INTO users(id, email, date_added, already_consumed) VALUES(?, ?, ?, NULL)"
+			query = "INSERT INTO users(id, email, date_added, redeemed) VALUES(?, ?, ?, NULL)"
 			args = []interface{}{user.ID, user.Email, user.DateAdded}
 		}
 

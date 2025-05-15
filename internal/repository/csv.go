@@ -38,7 +38,7 @@ func NewCSVRepository(filePath string, logger *logger.Logger) (*CSVRepository, e
 		defer writer.Flush()
 		
 		// Write header
-		err = writer.Write([]string{"ID", "Email", "DateAdded", "AlreadyConsumed"})
+		err = writer.Write([]string{"ID", "Email", "DateAdded", "Redeemed"})
 		if err != nil {
 			return nil, err
 		}
@@ -99,11 +99,11 @@ func (r *CSVRepository) FindByEmail(ctx any, email string) (*domain.User, error)
 				}
 			}
 
-			// Parse AlreadyConsumed
+			// Parse Redeemed
 			if len(record) >= 4 && record[3] != "" {
 				consumed, err := time.Parse(time.RFC3339, record[3])
 				if err == nil {
-					user.AlreadyConsumed = &consumed
+					user.Redeemed = &consumed
 				}
 			}
 
@@ -151,8 +151,8 @@ func (r *CSVRepository) UpdateUser(ctx any, user *domain.User) error {
 			record[0] = user.ID
 			record[2] = user.DateAdded.Format(time.RFC3339)
 
-			if user.AlreadyConsumed != nil {
-				record[3] = user.AlreadyConsumed.Format(time.RFC3339)
+			if user.Redeemed != nil {
+				record[3] = user.Redeemed.Format(time.RFC3339)
 			} else {
 				record[3] = ""
 			}
@@ -172,8 +172,8 @@ func (r *CSVRepository) UpdateUser(ctx any, user *domain.User) error {
 			"",
 		}
 
-		if user.AlreadyConsumed != nil {
-			newRecord[3] = user.AlreadyConsumed.Format(time.RFC3339)
+		if user.Redeemed != nil {
+			newRecord[3] = user.Redeemed.Format(time.RFC3339)
 		}
 
 		records = append(records, newRecord)

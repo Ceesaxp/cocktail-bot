@@ -48,7 +48,7 @@ func TestSQLiteRepository(t *testing.T) {
 			t.Errorf("Expected email test1@example.com, got %s", user.Email)
 		}
 		
-		if user.AlreadyConsumed != nil {
+		if user.Redeemed != nil {
 			t.Errorf("User should not have consumed cocktail")
 		}
 	})
@@ -97,7 +97,7 @@ func TestSQLiteRepository(t *testing.T) {
 			t.Errorf("Error finding updated user: %v", err)
 		}
 		
-		if updatedUser.AlreadyConsumed == nil {
+		if updatedUser.Redeemed == nil {
 			t.Errorf("User should have consumed cocktail")
 		}
 	})
@@ -107,7 +107,7 @@ func TestSQLiteRepository(t *testing.T) {
 			ID:              "999",
 			Email:           "nonexistent@example.com",
 			DateAdded:       time.Now(),
-			AlreadyConsumed: nil,
+			Redeemed: nil,
 		}
 		
 		err := repo.UpdateUser(nil, nonExistentUser)
@@ -129,7 +129,7 @@ func initTestData(repo domain.Repository, dbPath string) error {
 	
 	// Insert test users
 	now := time.Now()
-	stmt, err := db.Prepare("INSERT INTO users (id, email, date_added, already_consumed) VALUES (?, ?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO users (id, email, date_added, redeemed) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return err
 	}

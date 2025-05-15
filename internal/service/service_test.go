@@ -30,9 +30,9 @@ func (r *mockRepository) FindByEmail(ctx any, email string) (*domain.User, error
 	}
 	// Return a copy to prevent mutation
 	userCopy := *user
-	if user.AlreadyConsumed != nil {
-		timeCopy := *user.AlreadyConsumed
-		userCopy.AlreadyConsumed = &timeCopy
+	if user.Redeemed != nil {
+		timeCopy := *user.Redeemed
+		userCopy.Redeemed = &timeCopy
 	}
 	return &userCopy, nil
 }
@@ -44,9 +44,9 @@ func (r *mockRepository) UpdateUser(ctx any, user *domain.User) error {
 	}
 	// Update user
 	userCopy := *user
-	if user.AlreadyConsumed != nil {
-		timeCopy := *user.AlreadyConsumed
-		userCopy.AlreadyConsumed = &timeCopy
+	if user.Redeemed != nil {
+		timeCopy := *user.Redeemed
+		userCopy.Redeemed = &timeCopy
 	}
 	r.users[user.Email] = &userCopy
 	return nil
@@ -77,14 +77,14 @@ func TestCheckEmailStatus(t *testing.T) {
 		ID:              "1",
 		Email:           "user1@example.com",
 		DateAdded:       now,
-		AlreadyConsumed: nil,
+		Redeemed: nil,
 	}
 
 	mockRepo.users["user2@example.com"] = &domain.User{
 		ID:              "2",
 		Email:           "user2@example.com",
 		DateAdded:       now,
-		AlreadyConsumed: &redeemTime,
+		Redeemed: &redeemTime,
 	}
 
 	// Create logger
@@ -150,14 +150,14 @@ func TestRedeemCocktail(t *testing.T) {
 		ID:              "1",
 		Email:           "eligible@example.com",
 		DateAdded:       now,
-		AlreadyConsumed: nil,
+		Redeemed: nil,
 	}
 
 	mockRepo.users["redeemed@example.com"] = &domain.User{
 		ID:              "2",
 		Email:           "redeemed@example.com",
 		DateAdded:       now,
-		AlreadyConsumed: &redeemTime,
+		Redeemed: &redeemTime,
 	}
 
 	// Create logger
@@ -185,7 +185,7 @@ func TestRedeemCocktail(t *testing.T) {
 		t.Errorf("Failed to find updated user: %v", err)
 	}
 
-	if updatedUser == nil || updatedUser.AlreadyConsumed == nil {
+	if updatedUser == nil || updatedUser.Redeemed == nil {
 		t.Errorf("User should have been updated with redemption time")
 	}
 

@@ -21,12 +21,12 @@ func TestCSVRepository(t *testing.T) {
 
 	// Create test data
 	now := time.Now()
-	consumedTime := now.Add(-24 * time.Hour)
+	redeemedTime := now.Add(-24 * time.Hour)
 
 	// Write initial data
-	initialData := "ID,Email,Date Added,Already Consumed\n" +
+	initialData := "ID,Email,Date Added,Redeemed\n" +
 		"1,user1@example.com," + now.Format(time.RFC3339) + ",\n" +
-		"2,user2@example.com," + now.Format(time.RFC3339) + "," + consumedTime.Format(time.RFC3339) + "\n"
+		"2,user2@example.com," + now.Format(time.RFC3339) + "," + redeemedTime.Format(time.RFC3339) + "\n"
 
 	if _, err := tmpfile.Write([]byte(initialData)); err != nil {
 		t.Fatalf("Failed to write to temp file: %v", err)
@@ -56,7 +56,7 @@ func TestCSVRepository(t *testing.T) {
 		t.Fatalf("User1 should not be nil")
 	}
 
-	if user1.ID != "1" || user1.Email != "user1@example.com" || user1.AlreadyConsumed != nil {
+	if user1.ID != "1" || user1.Email != "user1@example.com" || user1.Redeemed != nil {
 		t.Errorf("User1 data incorrect: %+v", user1)
 	}
 
@@ -70,7 +70,7 @@ func TestCSVRepository(t *testing.T) {
 		t.Fatalf("User2 should not be nil")
 	}
 
-	if user2.ID != "2" || user2.Email != "user2@example.com" || user2.AlreadyConsumed == nil {
+	if user2.ID != "2" || user2.Email != "user2@example.com" || user2.Redeemed == nil {
 		t.Errorf("User2 data incorrect: %+v", user2)
 	}
 
@@ -103,7 +103,7 @@ func TestCSVRepository(t *testing.T) {
 		t.Errorf("Failed to find updated user1: %v", err)
 	}
 
-	if updatedUser1 == nil || updatedUser1.AlreadyConsumed == nil {
+	if updatedUser1 == nil || updatedUser1.Redeemed == nil {
 		t.Errorf("User1 should have been updated with redemption time")
 	}
 

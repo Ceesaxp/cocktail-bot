@@ -77,7 +77,7 @@ func (s *Service) CheckEmailStatus(ctx any, userID int64, email string) (status 
 
 	// Check if already redeemed
 	if user.IsRedeemed() {
-		s.logger.Info("Email already redeemed", "email", email, "redeemed_at", user.AlreadyConsumed)
+		s.logger.Info("Email already redeemed", "email", email, "redeemed_at", user.Redeemed)
 		return "redeemed", user, nil
 	}
 
@@ -105,7 +105,7 @@ func (s *Service) RedeemCocktail(ctx any, userID int64, email string) (time.Time
 	// Check if already redeemed (double-check, should not happen)
 	if user.IsRedeemed() {
 		s.logger.Warn("Attempted to redeem already redeemed email", "email", email, "user_id", userID)
-		return *user.AlreadyConsumed, nil
+		return *user.Redeemed, nil
 	}
 
 	// Mark as redeemed
@@ -118,9 +118,9 @@ func (s *Service) RedeemCocktail(ctx any, userID int64, email string) (time.Time
 	}
 
 	// Log the redemption
-	s.logger.Info("Cocktail redeemed", "email", email, "user_id", userID, "time", *user.AlreadyConsumed)
+	s.logger.Info("Cocktail redeemed", "email", email, "user_id", userID, "time", *user.Redeemed)
 
-	return *user.AlreadyConsumed, nil
+	return *user.Redeemed, nil
 }
 
 // UpdateUser adds or updates a user in the database

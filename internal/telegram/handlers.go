@@ -65,7 +65,7 @@ func (b *Bot) handleEmailCheck(message *tgbotapi.Message) {
 	case "unavailable":
 		b.sendTranslated(message.Chat.ID, message.From.ID, "system_unavailable")
 	case "redeemed":
-		dateStr := user.AlreadyConsumed.Format("January 2, 2006")
+		dateStr := user.Redeemed.Format("January 2, 2006")
 		b.sendTranslated(message.Chat.ID, message.From.ID, "already_redeemed", "date", dateStr)
 	case "eligible":
 		b.sendEligibleMessage(message.Chat.ID, message.From.ID)

@@ -234,7 +234,7 @@ func (s *Server) handleEmail(w http.ResponseWriter, r *http.Request) {
 		ID:              GenerateUniqueID(),
 		Email:           email,
 		DateAdded:       time.Now(),
-		AlreadyConsumed: nil,
+		Redeemed: nil,
 	}
 
 	// Store in database using service

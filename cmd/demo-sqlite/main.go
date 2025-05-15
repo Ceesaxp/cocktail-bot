@@ -94,7 +94,7 @@ func createDemoTable(dbPath string) error {
 	yesterday := now.Add(-24 * time.Hour)
 	
 	// Insert test data
-	stmt, err := db.Prepare("INSERT INTO users (id, email, date_added, already_consumed) VALUES (?, ?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO users (id, email, date_added, redeemed) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -142,7 +142,7 @@ func addUser(dbPath, email string) error {
 	now := time.Now()
 	id := fmt.Sprintf("%d", now.UnixNano())
 	
-	stmt, err := db.Prepare("INSERT INTO users (id, email, date_added, already_consumed) VALUES (?, ?, ?, ?)")
+	stmt, err := db.Prepare("INSERT INTO users (id, email, date_added, redeemed) VALUES (?, ?, ?, ?)")
 	if err != nil {
 		return fmt.Errorf("failed to prepare statement: %w", err)
 	}
@@ -165,7 +165,7 @@ func showAllUsers(dbPath string) error {
 	}
 	defer db.Close()
 	
-	rows, err := db.Query("SELECT id, email, date_added, already_consumed FROM users ORDER BY date_added DESC")
+	rows, err := db.Query("SELECT id, email, date_added, redeemed FROM users ORDER BY date_added DESC")
 	if err != nil {
 		return fmt.Errorf("failed to query users: %w", err)
 	}
@@ -231,8 +231,8 @@ func checkUser(repo domain.Repository, email string) error {
 	fmt.Printf("  ID:        %s\n", user.ID)
 	fmt.Printf("  Added:     %s\n", user.DateAdded.Format("2006-01-02 15:04:05"))
 	
-	if user.AlreadyConsumed != nil {
-		fmt.Printf("  Redeemed:  %s\n", user.AlreadyConsumed.Format("2006-01-02 15:04:05"))
+	if user.Redeemed != nil {
+		fmt.Printf("  Redeemed:  %s\n", user.Redeemed.Format("2006-01-02 15:04:05"))
 		fmt.Printf("  Status:    Already redeemed\n")
 	} else {
 		fmt.Printf("  Redeemed:  Not yet\n")
@@ -252,9 +252,9 @@ func redeemUser(repo domain.Repository, email string) error {
 		return fmt.Errorf("error finding user: %w", err)
 	}
 	
-	if user.AlreadyConsumed != nil {
+	if user.Redeemed != nil {
 		fmt.Printf("User %s has already redeemed their cocktail on %s\n", 
-			email, user.AlreadyConsumed.Format("2006-01-02 15:04:05"))
+			email, user.Redeemed.Format("2006-01-02 15:04:05"))
 		return nil
 	}
 	
@@ -268,7 +268,7 @@ func redeemUser(repo domain.Repository, email string) error {
 	}
 	
 	fmt.Printf("User %s has successfully redeemed their cocktail on %s\n", 
-		email, user.AlreadyConsumed.Format("2006-01-02 15:04:05"))
+		email, user.Redeemed.Format("2006-01-02 15:04:05"))
 	
 	return nil
 }

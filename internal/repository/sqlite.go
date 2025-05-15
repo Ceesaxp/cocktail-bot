@@ -74,7 +74,7 @@ func createTableIfNotExists(db *sql.DB) error {
 		id TEXT PRIMARY KEY,
 		email TEXT UNIQUE NOT NULL,
 		date_added TIMESTAMP NOT NULL,
-		already_consumed TIMESTAMP
+		redeemed TIMESTAMP
 	);
 	CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 	`
@@ -87,7 +87,7 @@ func (r *SQLiteRepository) FindByEmail(ctx any, email string) (*domain.User, err
 	r.mu.Lock()
 	defer r.mu.Unlock()
 
-	query := `SELECT id, email, date_added, already_consumed FROM users WHERE LOWER(email) = LOWER(?)`
+	query := `SELECT id, email, date_added, redeemed FROM users WHERE LOWER(email) = LOWER(?)`
 	row := r.db.QueryRow(query, email)
 
 	var (
@@ -118,7 +118,7 @@ func (r *SQLiteRepository) FindByEmail(ctx any, email string) (*domain.User, err
 		ID:              id,
 		Email:           dbEmail,
 		DateAdded:       dateAdded,
-		AlreadyConsumed: consumedTime,
+		Redeemed: consumedTime,
 	}, nil
 }
 
@@ -128,14 +128,14 @@ func (r *SQLiteRepository) UpdateUser(ctx any, user *domain.User) error {
 	defer r.mu.Unlock()
 
 	var consumedTime sql.NullTime
-	if user.AlreadyConsumed != nil {
+	if user.Redeemed != nil {
 		consumedTime = sql.NullTime{
-			Time:  *user.AlreadyConsumed,
+			Time:  *user.Redeemed,
 			Valid: true,
 		}
 	}
 
-	query := `UPDATE users SET already_consumed = ? WHERE id = ?`
+	query := `UPDATE users SET redeemed = ? WHERE id = ?`
 	result, err := r.db.Exec(query, consumedTime, user.ID)
 	if err != nil {
 		if r.logger != nil {

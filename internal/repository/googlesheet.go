@@ -107,12 +107,12 @@ func (r *GoogleSheetRepository) FindByEmail(ctx any, email string) (*domain.User
 					}
 				}
 
-				// Parse AlreadyConsumed
+				// Parse Redeemed
 				if len(row) >= 4 {
-					if consumedStr, ok := row[3].(string); ok && consumedStr != "" {
-						consumed, err := time.Parse(time.RFC3339, consumedStr)
+					if redeemedStr, ok := row[3].(string); ok && redeemedStr != "" {
+						redeemed, err := time.Parse(time.RFC3339, redeemedStr)
 						if err == nil {
-							user.AlreadyConsumed = &consumed
+							user.Redeemed = &redeemed
 						}
 					}
 				}
@@ -165,8 +165,8 @@ func (r *GoogleSheetRepository) UpdateUser(ctx any, user *domain.User) error {
 	values = append(values, user.Email)
 	values = append(values, user.DateAdded.Format(time.RFC3339))
 
-	if user.AlreadyConsumed != nil {
-		values = append(values, user.AlreadyConsumed.Format(time.RFC3339))
+	if user.Redeemed != nil {
+		values = append(values, user.Redeemed.Format(time.RFC3339))
 	} else {
 		values = append(values, "")
 	}

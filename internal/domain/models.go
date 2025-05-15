@@ -5,21 +5,21 @@ import (
 )
 
 type User struct {
-	ID              string
-	Email           string
-	DateAdded       time.Time
-	AlreadyConsumed *time.Time
+	ID         string
+	Email      string
+	DateAdded  time.Time
+	Redeemed   *time.Time
 }
 
 // IsRedeemed returns true if the user has already redeemed their cocktail
 func (u *User) IsRedeemed() bool {
-	return u.AlreadyConsumed != nil
+	return u.Redeemed != nil
 }
 
 // Redeem marks the user as having redeemed their cocktail with the current time
 func (u *User) Redeem() {
 	now := time.Now()
-	u.AlreadyConsumed = &now
+	u.Redeemed = &now
 }
 
 // Repository is the interface that all database implementations must satisfy

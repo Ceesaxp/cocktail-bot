@@ -145,7 +145,7 @@ func setupSheet(credentials string, spreadsheetID string, sheetName string) erro
 	}
 
 	// Set up headers
-	headers := []interface{}{"ID", "Email", "Date Added", "Already Consumed"}
+	headers := []interface{}{"ID", "Email", "Date Added", "Redeemed"}
 	valueRange := &sheets.ValueRange{
 		Values: [][]interface{}{headers},
 	}
@@ -240,7 +240,7 @@ func addUser(repo domain.Repository, email string) error {
 		ID:              id,
 		Email:           email,
 		DateAdded:       now,
-		AlreadyConsumed: nil,
+		Redeemed: nil,
 	}
 
 	// Add to repository
@@ -338,8 +338,8 @@ func checkUser(repo domain.Repository, email string) error {
 	fmt.Printf("  ID:        %s\n", user.ID)
 	fmt.Printf("  Added:     %s\n", user.DateAdded.Format("2006-01-02 15:04:05"))
 	
-	if user.AlreadyConsumed != nil {
-		fmt.Printf("  Redeemed:  %s\n", user.AlreadyConsumed.Format("2006-01-02 15:04:05"))
+	if user.Redeemed != nil {
+		fmt.Printf("  Redeemed:  %s\n", user.Redeemed.Format("2006-01-02 15:04:05"))
 		fmt.Printf("  Status:    Already redeemed\n")
 	} else {
 		fmt.Printf("  Redeemed:  Not yet\n")
@@ -359,9 +359,9 @@ func redeemUser(repo domain.Repository, email string) error {
 		return fmt.Errorf("error finding user: %w", err)
 	}
 	
-	if user.AlreadyConsumed != nil {
+	if user.Redeemed != nil {
 		fmt.Printf("User %s has already redeemed their cocktail on %s\n", 
-			email, user.AlreadyConsumed.Format("2006-01-02 15:04:05"))
+			email, user.Redeemed.Format("2006-01-02 15:04:05"))
 		return nil
 	}
 	
@@ -375,7 +375,7 @@ func redeemUser(repo domain.Repository, email string) error {
 	}
 	
 	fmt.Printf("User %s has successfully redeemed their cocktail on %s\n", 
-		email, user.AlreadyConsumed.Format("2006-01-02 15:04:05"))
+		email, user.Redeemed.Format("2006-01-02 15:04:05"))
 	
 	return nil
 }

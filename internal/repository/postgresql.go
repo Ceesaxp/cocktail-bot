@@ -46,7 +46,7 @@ func NewPostgresRepository(ctx any, connectionString string, logger *logger.Logg
 			id VARCHAR(255) PRIMARY KEY,
 			email VARCHAR(255) UNIQUE NOT NULL,
 			date_added TIMESTAMP NOT NULL,
-			already_consumed TIMESTAMP
+			redeemed TIMESTAMP
 		);
 		CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 	`)
@@ -74,20 +74,20 @@ func (r *PostgresRepository) FindByEmail(ctx any, email string) (*domain.User, e
 	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	row := r.db.QueryRowContext(ctxWithTimeout, `
-		SELECT id, email, date_added, already_consumed
+		SELECT id, email, date_added, redeemed
 		FROM users
 		WHERE email = $1
 	`, email)
 
 	// Parse result
 	var (
-		id                string
-		userEmail         string
-		dateAdded         time.Time
-		alreadyConsumedSQL sql.NullTime
+		id          string
+		userEmail   string
+		dateAdded   time.Time
+		redeemedSQL sql.NullTime
 	)
 
-	err := row.Scan(&id, &userEmail, &dateAdded, &alreadyConsumedSQL)
+	err := row.Scan(&id, &userEmail, &dateAdded, &redeemedSQL)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			r.logger.Debug("User not found in PostgreSQL", "email", email)
@@ -104,10 +104,10 @@ func (r *PostgresRepository) FindByEmail(ctx any, email string) (*domain.User, e
 		DateAdded: dateAdded,
 	}
 
-	// Handle already consumed
-	if alreadyConsumedSQL.Valid {
-		consumed := alreadyConsumedSQL.Time
-		user.AlreadyConsumed = &consumed
+	// Handle redeemed
+	if redeemedSQL.Valid {
+		redeemed := redeemedSQL.Time
+		user.Redeemed = &redeemed
 	}
 
 	r.logger.Debug("Found user in PostgreSQL", "email", email, "redeemed", user.IsRedeemed())
@@ -133,18 +133,18 @@ func (r *PostgresRepository) UpdateUser(ctx any, user *domain.User) error {
 
 	// Use upsert (INSERT ON CONFLICT UPDATE) for atomic operation
 	query := `
-		INSERT INTO users (id, email, date_added, already_consumed)
+		INSERT INTO users (id, email, date_added, redeemed)
 		VALUES ($1, $2, $3, $4)
 		ON CONFLICT (email)
 		DO UPDATE SET
 			id = EXCLUDED.id,
 			date_added = EXCLUDED.date_added,
-			already_consumed = EXCLUDED.already_consumed
+			redeemed = EXCLUDED.redeemed
 	`
 
 	var args []interface{}
-	if user.AlreadyConsumed != nil {
-		args = []interface{}{user.ID, user.Email, user.DateAdded, user.AlreadyConsumed}
+	if user.Redeemed != nil {
+		args = []interface{}{user.ID, user.Email, user.DateAdded, user.Redeemed}
 	} else {
 		args = []interface{}{user.ID, user.Email, user.DateAdded, nil}
 	}

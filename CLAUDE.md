@@ -104,4 +104,4 @@ The core entity is `User`:
 - ID: string
 - Email: string
 - DateAdded: time.Time
-- AlreadyConsumed: *time.Time (nullable, indicates redemption)
+- Redeemed: *time.Time (nullable, indicates redemption)

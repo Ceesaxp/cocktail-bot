@@ -88,7 +88,7 @@ User {
   ID: unique identifier
   Email: string (stored as lowercase)
   DateAdded: datetime
-  AlreadyConsumed: datetime (nullable)
+  Redeemed: datetime (nullable)
 }
 ```
 

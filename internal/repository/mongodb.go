@@ -46,7 +46,10 @@ func NewMongoDBRepository(ctx any, connectionString string, logger *logger.Logge
 	// Check connection
 	err = client.Ping(context.Background(), nil)
 	if err != nil {
-		client.Disconnect(context.Background())
+		disconnectErr := client.Disconnect(context.Background())
+		if disconnectErr != nil {
+			logger.Error("Failed to disconnect MongoDB client", "error", disconnectErr)
+		}
 		logger.Error("Failed to ping MongoDB", "error", err)
 		return nil, domain.ErrDatabaseUnavailable
 	}
@@ -66,7 +69,10 @@ func NewMongoDBRepository(ctx any, connectionString string, logger *logger.Logge
 	}
 	_, err = collection.Indexes().CreateOne(context.Background(), indexModel)
 	if err != nil {
-		client.Disconnect(context.Background())
+		disconnectErr := client.Disconnect(context.Background())
+		if disconnectErr != nil {
+			logger.Error("Failed to disconnect MongoDB client", "error", disconnectErr)
+		}
 		logger.Error("Failed to create index", "error", err)
 		return nil, err
 	}

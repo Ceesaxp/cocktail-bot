@@ -260,10 +260,12 @@ func (s *Server) handleEmail(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(map[string]string{
+	if err := json.NewEncoder(w).Encode(map[string]string{
 		"status":  "ok",
 		"version": "1.0.0",
-	})
+	}); err != nil {
+		s.logger.Error("Error encoding health check response", "error", err)
+	}
 }
 
 // writeJSONResponse writes a JSON response with the given status code

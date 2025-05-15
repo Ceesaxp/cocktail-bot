@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/ceesaxp/cocktail-bot/internal/config"
 	"github.com/ceesaxp/cocktail-bot/internal/domain"
 	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	"github.com/ceesaxp/cocktail-bot/internal/ratelimit"
@@ -56,14 +55,6 @@ func (r *mockRepository) Close() error {
 	return nil
 }
 
-// mockRepositoryFactory is a factory that creates a mock repository
-type mockRepositoryFactory struct {
-	repo *mockRepository
-}
-
-func (f *mockRepositoryFactory) NewRepository(ctx any, cfg config.DatabaseConfig, logger *logger.Logger) (domain.Repository, error) {
-	return f.repo, nil
-}
 
 func TestCheckEmailStatus(t *testing.T) {
 	// Create mock repository

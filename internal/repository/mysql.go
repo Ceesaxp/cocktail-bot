@@ -129,7 +129,11 @@ func (r *MySQLRepository) UpdateUser(ctx any, user *domain.User) error {
 		r.logger.Error("Failed to begin transaction", "error", err)
 		return err
 	}
-	defer tx.Rollback()
+	defer func() {
+		if err := tx.Rollback(); err != nil && err != sql.ErrTxDone {
+			r.logger.Error("Failed to rollback transaction", "error", err)
+		}
+	}()
 
 	// Check if user exists
 	var exists bool

@@ -78,7 +78,9 @@ func (b *Bot) handleEmailCheck(message *tgbotapi.Message) {
 func (b *Bot) handleCallbackQuery(query *tgbotapi.CallbackQuery) {
 	// Acknowledge the callback query
 	callback := tgbotapi.NewCallback(query.ID, "")
-	b.api.Request(callback)
+	if _, err := b.api.Request(callback); err != nil {
+		b.logger.Error("Error acknowledging callback query", "error", err)
+	}
 
 	// Handle language selection
 	if strings.HasPrefix(query.Data, "lang_") {
@@ -152,7 +154,9 @@ func (b *Bot) sendEligibleMessage(chatID int64, userID int64) {
 	text := b.translate(userID, "eligible")
 	msg := tgbotapi.NewMessage(chatID, text)
 	msg.ReplyMarkup = keyboard
-	b.api.Send(msg)
+	if _, err := b.api.Send(msg); err != nil {
+		b.logger.Error("Failed to send message with keyboard", "error", err)
+	}
 }
 
 // sendHelpMessage sends help information
@@ -200,7 +204,9 @@ func (b *Bot) sendLanguageOptions(chatID int64) {
 	keyboard := tgbotapi.NewInlineKeyboardMarkup(rows...)
 	msg := tgbotapi.NewMessage(chatID, b.translate(0, "language_command"))
 	msg.ReplyMarkup = keyboard
-	b.api.Send(msg)
+	if _, err := b.api.Send(msg); err != nil {
+		b.logger.Error("Failed to send language options message", "error", err)
+	}
 }
 
 // handleLanguageSelection processes language selection from the user
@@ -240,5 +246,7 @@ func (b *Bot) removeButtons(message *tgbotapi.Message) {
 			InlineKeyboard: [][]tgbotapi.InlineKeyboardButton{},
 		},
 	)
-	b.api.Send(edit)
+	if _, err := b.api.Send(edit); err != nil {
+		b.logger.Error("Failed to remove buttons from message", "error", err)
+	}
 }

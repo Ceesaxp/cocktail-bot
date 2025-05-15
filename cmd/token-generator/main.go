@@ -72,7 +72,10 @@ func main() {
 		if _, err := os.Stat(*outputFile); err == nil {
 			fmt.Printf("\nWarning: File %s already exists. Overwrite? (y/n): ", *outputFile)
 			var response string
-			fmt.Scanln(&response)
+			if _, err := fmt.Scanln(&response); err != nil {
+				fmt.Println("Error reading response:", err)
+				response = "n" // Default to 'no' if error
+			}
 			if !strings.HasPrefix(strings.ToLower(response), "y") {
 				fmt.Println("Operation cancelled.")
 				return
@@ -128,7 +131,7 @@ func main() {
 func generateTokens(count, length int) ([]string, error) {
 	tokens := make([]string, count)
 
-	for i := range count {
+	for i := 0; i < count; i++ {
 		// Generate random bytes
 		randomBytes := make([]byte, length)
 		if _, err := rand.Read(randomBytes); err != nil {

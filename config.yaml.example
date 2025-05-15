@@ -24,3 +24,18 @@ rate_limiting:
   requests_per_minute: 10
   # Maximum requests per hour per user
   requests_per_hour: 100
+
+# REST API settings
+api:
+  # Enable or disable the REST API
+  enabled: false
+  # Port to listen on
+  port: 8080
+  # File containing authentication tokens
+  tokens_file: "./api_tokens.yaml"
+  # You can also specify tokens directly (not recommended)
+  # auth_tokens:
+  #   - "your_token_here"
+  # API-specific rate limiting
+  rate_limit_per_min: 30
+  rate_limit_per_hour: 300

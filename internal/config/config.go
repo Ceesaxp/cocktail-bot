@@ -16,11 +16,12 @@ const (
 
 // Config represents the application configuration
 type Config struct {
-	LogLevel    string         `yaml:"log_level"`
-	Telegram    TelegramConfig `yaml:"telegram"`
-	Database    DatabaseConfig `yaml:"database"`
+	LogLevel     string          `yaml:"log_level"`
+	Telegram     TelegramConfig  `yaml:"telegram"`
+	Database     DatabaseConfig  `yaml:"database"`
 	RateLimiting RateLimitConfig `yaml:"rate_limiting"`
-	Language    LanguageConfig `yaml:"language"`
+	Language     LanguageConfig  `yaml:"language"`
+	API          APIConfig       `yaml:"api"`
 }
 
 // TelegramConfig holds Telegram bot configuration
@@ -47,6 +48,16 @@ type LanguageConfig struct {
 	Enabled         []string `yaml:"enabled"`
 }
 
+// APIConfig holds REST API configuration
+type APIConfig struct {
+	Enabled          bool     `yaml:"enabled"`
+	Port             int      `yaml:"port"`
+	AuthTokens       []string `yaml:"auth_tokens"`
+	TokensFile       string   `yaml:"tokens_file"`
+	RateLimitPerMin  int      `yaml:"rate_limit_per_min"`
+	RateLimitPerHour int      `yaml:"rate_limit_per_hour"`
+}
+
 // New creates a new default configuration
 func New() *Config {
 	return &Config{
@@ -62,7 +73,15 @@ func New() *Config {
 		},
 		Language: LanguageConfig{
 			DefaultLanguage: "en",
-			Enabled:         []string{"en", "es", "fr", "de", "ru"},
+			Enabled:         []string{"en", "es", "fr", "de", "ru", "sr"},
+		},
+		API: APIConfig{
+			Enabled:          false,
+			Port:             8080,
+			AuthTokens:       []string{},
+			TokensFile:       "./api_tokens.yaml",
+			RateLimitPerMin:  30,
+			RateLimitPerHour: 300,
 		},
 	}
 }
@@ -153,6 +172,29 @@ func loadFromEnvironment(cfg *Config) {
 			}
 		}
 	}
+
+	// API
+	if value := os.Getenv(envPrefix + "API_ENABLED"); value != "" {
+		cfg.API.Enabled = strings.ToLower(value) == "true" || value == "1"
+	}
+	if value := os.Getenv(envPrefix + "API_PORT"); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil && intValue > 0 {
+			cfg.API.Port = intValue
+		}
+	}
+	if value := os.Getenv(envPrefix + "API_TOKENS_FILE"); value != "" {
+		cfg.API.TokensFile = value
+	}
+	if value := os.Getenv(envPrefix + "API_RATE_LIMIT_PER_MIN"); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil && intValue > 0 {
+			cfg.API.RateLimitPerMin = intValue
+		}
+	}
+	if value := os.Getenv(envPrefix + "API_RATE_LIMIT_PER_HOUR"); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil && intValue > 0 {
+			cfg.API.RateLimitPerHour = intValue
+		}
+	}
 }
 
 // GetConfigPath returns the config file path based on the provided path or default
@@ -225,6 +267,47 @@ func (c *Config) IsLanguageEnabled(lang string) bool {
 		}
 	}
 	return false
+}
+
+// LoadAuthTokens loads API authentication tokens from the configured tokens file
+func (c *Config) LoadAuthTokens() error {
+	// Skip if API is not enabled
+	if !c.API.Enabled {
+		return nil
+	}
+
+	// If tokens file is not specified, nothing to load
+	if c.API.TokensFile == "" {
+		return nil
+	}
+
+	// Check if the file exists
+	if _, err := os.Stat(c.API.TokensFile); os.IsNotExist(err) {
+		return nil // File doesn't exist, not an error
+	}
+
+	// Read the file
+	data, err := os.ReadFile(c.API.TokensFile)
+	if err != nil {
+		return err
+	}
+
+	// Parse YAML into a temporary struct
+	var tokensConfig struct {
+		AuthTokens []string `yaml:"auth_tokens"`
+	}
+
+	err = yaml.Unmarshal(data, &tokensConfig)
+	if err != nil {
+		return err
+	}
+
+	// Update config with loaded tokens
+	if len(tokensConfig.AuthTokens) > 0 {
+		c.API.AuthTokens = tokensConfig.AuthTokens
+	}
+
+	return nil
 }
 
 // SupportedDatabaseTypes returns a list of supported database types

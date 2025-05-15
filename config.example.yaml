@@ -22,7 +22,7 @@ database:
   # CSV:
   # type: "csv"
   # connection_string: "./data/users.csv"
-  
+
   # SQLite:
   # type: "sqlite"
   # connection_string: "./data/users.db"
@@ -40,9 +40,17 @@ language:
   default_language: "en"
   # List of enabled languages
   enabled:
-    - "en"  # English
-    - "es"  # Spanish
-    - "fr"  # French
-    - "de"  # German
-    - "ru"  # Russian
+    - "en" # English
+    - "es" # Spanish
+    - "fr" # French
+    - "de" # German
+    - "ru" # Russian
     # - "sr"  # Serbian (uncomment to enable)
+
+# API settings
+api:
+  enabled: true
+  port: 8080
+  tokens_file: "api_tokens.yaml"
+  rate_limit_per_min: 30
+  rate_limit_per_hour: 300

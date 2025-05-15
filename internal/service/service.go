@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"time"
 
 	"github.com/ceesaxp/cocktail-bot/internal/config"
@@ -120,6 +121,27 @@ func (s *Service) RedeemCocktail(ctx any, userID int64, email string) (time.Time
 	s.logger.Info("Cocktail redeemed", "email", email, "user_id", userID, "time", *user.AlreadyConsumed)
 
 	return *user.AlreadyConsumed, nil
+}
+
+// UpdateUser adds or updates a user in the database
+func (s *Service) UpdateUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
+
+	// Normalize email (in case it wasn't already)
+	user.Email = utils.NormalizeEmail(user.Email)
+
+	// Log the operation
+	s.logger.Info("Updating user", "email", user.Email, "id", user.ID)
+
+	// Update user in repository
+	if err := s.repo.UpdateUser(ctx, user); err != nil {
+		s.logger.Error("Error updating user", "email", user.Email, "error", err)
+		return err
+	}
+
+	return nil
 }
 
 // Close closes the service and its dependencies

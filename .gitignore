@@ -1,3 +1,4 @@
 config.yml
 .env
-config.yml
+config.yaml
+api_tokens.yaml

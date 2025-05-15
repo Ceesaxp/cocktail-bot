@@ -14,9 +14,18 @@ telegram:
 # Database settings
 database:
   # Database type (csv, sqlite, googlesheet, postgresql, mysql, mongodb)
-  type: "csv"
+  type: "sqlite"
   # Connection string or path
-  connection_string: "./data/users.csv"
+  connection_string: "./data/users.db"
+
+  # Additional examples:
+  # CSV:
+  # type: "csv"
+  # connection_string: "./data/users.csv"
+  
+  # SQLite:
+  # type: "sqlite"
+  # connection_string: "./data/users.db"
 
 # Rate limiting settings
 rate_limiting:

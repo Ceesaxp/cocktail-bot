@@ -7,16 +7,23 @@ log_level: info
 # Telegram settings
 telegram:
   # Bot token (get from BotFather)
-  token: "8099671361:AAHmiycnEk41vuD9he4RzmuiGaXAmogg-PE"
+  token: "7468147182:AAHQn-nGWxcHyOwiSug82JvpZWhX1C6ZgP4"
   # Bot username
-  user: "cocktail_redemption_bot"
+  user: "test_cocktail_redemption_bot"
 
 # Database settings
 database:
   # Database type (csv, sqlite, googlesheet, postgresql, mysql, mongodb)
-  type: "csv"
+  type: "sqlite"
   # Connection string or path
-  connection_string: "./data/users.csv"
+  connection_string: "./data/users.sqlite"
+  # For googlesheet connection string is "https://docs.google.com/spreadsheets/d/1234567890/edit#gid=0"
+  # -> https://docs.google.com/spreadsheets/d/1DttA5fdJiJTOChVewghcTMthDPoMa9Q655LxVBw0eVA/edit
+  # For csv and sqlite it is path to the csv/database file
+  # For googlesheet it is the url of the spreadsheet
+  # For postgresql it is the connection string
+  # For mysql it is the connection string
+  # For mongodb it is the connection string
 
 # Rate limiting settings
 rate_limiting:

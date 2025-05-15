@@ -21,6 +21,8 @@ func New(ctx any, cfg config.DatabaseConfig, logger *logger.Logger) (domain.Repo
 	switch dbType {
 	case "csv":
 		return NewCSVRepository(cfg.ConnectionString, logger)
+	case "sqlite":
+		return NewSQLiteRepository(cfg.ConnectionString, logger)
 	case "googlesheet":
 		return NewGoogleSheetRepository(ctx, cfg.ConnectionString, logger)
 	case "postgresql":

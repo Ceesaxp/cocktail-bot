@@ -13,7 +13,7 @@ import (
 )
 
 type GoogleSheetRepository struct {
-	service      *sheets.Service
+	service       *sheets.Service
 	spreadsheetID string
 	sheetName     string
 	logger        *logger.Logger
@@ -164,7 +164,7 @@ func (r *GoogleSheetRepository) UpdateUser(ctx any, user *domain.User) error {
 	values = append(values, user.ID)
 	values = append(values, user.Email)
 	values = append(values, user.DateAdded.Format(time.RFC3339))
-	
+
 	if user.AlreadyConsumed != nil {
 		values = append(values, user.AlreadyConsumed.Format(time.RFC3339))
 	} else {
@@ -214,7 +214,7 @@ func parseConnectionString(connStr string) []string {
 	// Simple parsing logic - in a real implementation, this would be more robust
 	// Format: credentialsPath|spreadsheetID|sheetName
 	parts := make([]string, 3)
-	
+
 	// Split by pipe
 	split := make([]string, 0)
 	current := ""
@@ -229,11 +229,11 @@ func parseConnectionString(connStr string) []string {
 	if current != "" {
 		split = append(split, current)
 	}
-	
+
 	// Copy to parts array
 	for i := 0; i < len(split) && i < 3; i++ {
 		parts[i] = split[i]
 	}
-	
+
 	return parts
 }

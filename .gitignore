@@ -2,3 +2,6 @@ config.yml
 .env
 config.yaml
 api_tokens.yaml
+.claude
+credentials.json
+data/demo.db

@@ -169,6 +169,50 @@ func (r *PostgresRepository) UpdateUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+// AddUser adds a new user to the database
+func (r *PostgresRepository) AddUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
+
+	r.logger.Debug("Adding user to PostgreSQL", "email", user.Email)
+
+	// Check if user already exists
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	var exists bool
+	err := r.db.QueryRowContext(ctxWithTimeout, "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", user.Email).Scan(&exists)
+	if err != nil {
+		r.logger.Error("Error checking if user exists", "error", err)
+		return err
+	}
+	
+	if exists {
+		r.logger.Debug("User already exists in PostgreSQL", "email", user.Email)
+		return errors.New("user already exists")
+	}
+
+	// Insert new user
+	query := `INSERT INTO users (id, email, date_added, redeemed) VALUES ($1, $2, $3, $4)`
+	
+	var args []interface{}
+	if user.Redeemed != nil {
+		args = []interface{}{user.ID, user.Email, user.DateAdded, user.Redeemed}
+	} else {
+		args = []interface{}{user.ID, user.Email, user.DateAdded, nil}
+	}
+	
+	_, err = r.db.ExecContext(ctxWithTimeout, query, args...)
+	if err != nil {
+		r.logger.Error("Error adding user", "error", err)
+		return fmt.Errorf("failed to add user: %w", err)
+	}
+	
+	r.logger.Debug("User added to PostgreSQL", "email", user.Email)
+	return nil
+}
+
 func (r *PostgresRepository) Close() error {
 	r.logger.Debug("Closing PostgreSQL repository")
 	if r.db != nil {

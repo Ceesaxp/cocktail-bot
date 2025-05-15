@@ -115,6 +115,46 @@ func TestSQLiteRepository(t *testing.T) {
 			t.Errorf("Expected ErrUserNotFound, got: %v", err)
 		}
 	})
+
+	t.Run("AddUser - New User", func(t *testing.T) {
+		newUser := &domain.User{
+			ID:        "3",
+			Email:     "newuser@example.com",
+			DateAdded: time.Now(),
+			Redeemed:  nil,
+		}
+		
+		// Add the user
+		err := repo.AddUser(nil, newUser)
+		if err != nil {
+			t.Errorf("Failed to add new user: %v", err)
+		}
+		
+		// Verify user was added
+		addedUser, err := repo.FindByEmail(nil, "newuser@example.com")
+		if err != nil {
+			t.Errorf("Failed to find added user: %v", err)
+		}
+		
+		if addedUser == nil || addedUser.ID != "3" {
+			t.Errorf("Added user data incorrect: %+v", addedUser)
+		}
+	})
+	
+	t.Run("AddUser - Duplicate Email", func(t *testing.T) {
+		duplicateUser := &domain.User{
+			ID:        "4",
+			Email:     "newuser@example.com", // Same email as existing user
+			DateAdded: time.Now(),
+			Redeemed:  nil,
+		}
+		
+		// Should get an error when trying to add a user with a duplicate email
+		err := repo.AddUser(nil, duplicateUser)
+		if err == nil {
+			t.Errorf("Expected error when adding user with duplicate email")
+		}
+	})
 }
 
 // initTestData initializes the test database with sample data

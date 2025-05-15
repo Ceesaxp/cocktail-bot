@@ -118,4 +118,42 @@ func TestCSVRepository(t *testing.T) {
 	if err != domain.ErrUserNotFound {
 		t.Errorf("Expected ErrUserNotFound for updating non-existent user, got: %v", err)
 	}
+
+	// Test AddUser
+	newUser := &domain.User{
+		ID:        "3",
+		Email:     "newuser@example.com",
+		DateAdded: time.Now(),
+		Redeemed:  nil,
+	}
+
+	// Add the user
+	err = repo.AddUser(ctx, newUser)
+	if err != nil {
+		t.Errorf("Failed to add new user: %v", err)
+	}
+
+	// Verify user was added
+	addedUser, err := repo.FindByEmail(ctx, "newuser@example.com")
+	if err != nil {
+		t.Errorf("Failed to find added user: %v", err)
+	}
+
+	if addedUser == nil || addedUser.ID != "3" {
+		t.Errorf("Added user data incorrect: %+v", addedUser)
+	}
+
+	// Test adding a user that already exists
+	duplicateUser := &domain.User{
+		ID:        "4",
+		Email:     "newuser@example.com", // Same email as existing user
+		DateAdded: time.Now(),
+		Redeemed:  nil,
+	}
+
+	// Should get an error when trying to add an existing user
+	err = repo.AddUser(ctx, duplicateUser)
+	if err == nil {
+		t.Errorf("Expected error when adding duplicate user")
+	}
 }

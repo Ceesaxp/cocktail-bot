@@ -203,6 +203,68 @@ func (r *GoogleSheetRepository) UpdateUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+// AddUser adds a new user to the Google Sheet
+func (r *GoogleSheetRepository) AddUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
+
+	r.logger.Debug("Adding user to Google Sheets", "email", user.Email)
+
+	// Define the range to read
+	readRange := fmt.Sprintf("%s!A:D", r.sheetName)
+
+	// Read data from sheet to check for duplicates
+	resp, err := r.service.Spreadsheets.Values.Get(r.spreadsheetID, readRange).Context(context.Background()).Do()
+	if err != nil {
+		r.logger.Error("Failed to read Google Sheet for add", "error", err)
+		return domain.ErrDatabaseUnavailable
+	}
+
+	// Check if user already exists
+	for i, row := range resp.Values {
+		if i == 0 { // Skip header
+			continue
+		}
+
+		if len(row) >= 2 {
+			if rowEmail, ok := row[1].(string); ok && rowEmail == user.Email {
+				r.logger.Debug("User already exists in Google Sheets", "email", user.Email)
+				return errors.New("user already exists")
+			}
+		}
+	}
+
+	// Prepare the new row data
+	var values []interface{}
+	values = append(values, user.ID)
+	values = append(values, user.Email)
+	values = append(values, user.DateAdded.Format(time.RFC3339))
+
+	if user.Redeemed != nil {
+		values = append(values, user.Redeemed.Format(time.RFC3339))
+	} else {
+		values = append(values, "")
+	}
+
+	// Append new row
+	updateRange := fmt.Sprintf("%s!A:D", r.sheetName)
+	valueRange := sheets.ValueRange{
+		Values: [][]interface{}{values},
+	}
+
+	_, err = r.service.Spreadsheets.Values.Append(r.spreadsheetID, updateRange, &valueRange).
+		ValueInputOption("RAW").InsertDataOption("INSERT_ROWS").Context(context.Background()).Do()
+
+	if err != nil {
+		r.logger.Error("Failed to add user to Google Sheet", "error", err)
+		return err
+	}
+
+	r.logger.Debug("User added to Google Sheets", "email", user.Email)
+	return nil
+}
+
 func (r *GoogleSheetRepository) Close() error {
 	r.logger.Debug("Closing Google Sheets repository")
 	// No explicit close method for Google Sheets API client

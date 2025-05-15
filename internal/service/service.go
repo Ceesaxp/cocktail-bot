@@ -123,7 +123,7 @@ func (s *Service) RedeemCocktail(ctx any, userID int64, email string) (time.Time
 	return *user.Redeemed, nil
 }
 
-// UpdateUser adds or updates a user in the database
+// UpdateUser updates an existing user in the database
 func (s *Service) UpdateUser(ctx any, user *domain.User) error {
 	if user == nil {
 		return errors.New("user cannot be nil")
@@ -138,6 +138,27 @@ func (s *Service) UpdateUser(ctx any, user *domain.User) error {
 	// Update user in repository
 	if err := s.repo.UpdateUser(ctx, user); err != nil {
 		s.logger.Error("Error updating user", "email", user.Email, "error", err)
+		return err
+	}
+
+	return nil
+}
+
+// AddUser adds a new user to the database
+func (s *Service) AddUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
+
+	// Normalize email (in case it wasn't already)
+	user.Email = utils.NormalizeEmail(user.Email)
+
+	// Log the operation
+	s.logger.Info("Adding new user", "email", user.Email, "id", user.ID)
+
+	// Add user to repository
+	if err := s.repo.AddUser(ctx, user); err != nil {
+		s.logger.Error("Error adding user", "email", user.Email, "error", err)
 		return err
 	}
 

@@ -164,19 +164,9 @@ func (r *CSVRepository) UpdateUser(ctx any, user *domain.User) error {
 	}
 
 	if !found {
-		// Add new record
-		newRecord := []string{
-			user.ID,
-			user.Email,
-			user.DateAdded.Format(time.RFC3339),
-			"",
-		}
-
-		if user.Redeemed != nil {
-			newRecord[3] = user.Redeemed.Format(time.RFC3339)
-		}
-
-		records = append(records, newRecord)
+		// User doesn't exist
+		r.logger.Debug("User not found for update", "email", user.Email)
+		return domain.ErrUserNotFound
 	}
 
 	// Write all records back
@@ -196,12 +186,78 @@ func (r *CSVRepository) UpdateUser(ctx any, user *domain.User) error {
 		return err
 	}
 	
-	if !found {
-		r.logger.Debug("User not found for update", "email", user.Email)
-		return domain.ErrUserNotFound
+	r.logger.Debug("User updated in CSV", "email", user.Email)
+	return nil
+}
+
+func (r *CSVRepository) AddUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
+
+	r.logger.Debug("Adding user to CSV", "email", user.Email)
+
+	// Read all records
+	file, err := os.Open(r.filePath)
+	if err != nil {
+		r.logger.Error("Failed to open CSV file for addition", "error", err)
+		return domain.ErrDatabaseUnavailable
+	}
+
+	reader := csv.NewReader(file)
+	records, err := reader.ReadAll()
+	if err != nil {
+		file.Close()
+		r.logger.Error("Failed to read CSV records", "error", err)
+		return err
+	}
+	file.Close()
+
+	// Check if user already exists
+	for i, record := range records {
+		if i == 0 { // Skip header
+			continue
+		}
+
+		if len(record) >= 2 && strings.EqualFold(record[1], user.Email) {
+			// User already exists, should use UpdateUser instead
+			r.logger.Debug("User already exists", "email", user.Email)
+			return errors.New("user already exists")
+		}
+	}
+
+	// Add new record
+	newRecord := []string{
+		user.ID,
+		user.Email,
+		user.DateAdded.Format(time.RFC3339),
+		"",
+	}
+
+	if user.Redeemed != nil {
+		newRecord[3] = user.Redeemed.Format(time.RFC3339)
+	}
+
+	records = append(records, newRecord)
+
+	// Write all records back
+	outFile, err := os.Create(r.filePath)
+	if err != nil {
+		r.logger.Error("Failed to open CSV file for writing", "error", err)
+		return err
+	}
+	defer outFile.Close()
+	
+	writer := csv.NewWriter(outFile)
+	defer writer.Flush()
+	
+	err = writer.WriteAll(records)
+	if err != nil {
+		r.logger.Error("Failed to write CSV records", "error", err)
+		return err
 	}
 	
-	r.logger.Debug("User updated in CSV", "email", user.Email)
+	r.logger.Debug("User added to CSV", "email", user.Email)
 	return nil
 }
 

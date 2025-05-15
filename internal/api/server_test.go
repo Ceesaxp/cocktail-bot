@@ -23,6 +23,9 @@ type mockService struct {
 	updateUserError   error
 	updateUserCalled  bool
 	updateUserPayload *domain.User
+	addUserError      error
+	addUserCalled     bool
+	addUserPayload    *domain.User
 }
 
 func (s *mockService) CheckEmailStatus(ctx any, userID int64, email string) (string, *domain.User, error) {
@@ -40,6 +43,12 @@ func (s *mockService) UpdateUser(ctx any, user *domain.User) error {
 	s.updateUserCalled = true
 	s.updateUserPayload = user
 	return s.updateUserError
+}
+
+func (s *mockService) AddUser(ctx any, user *domain.User) error {
+	s.addUserCalled = true
+	s.addUserPayload = user
+	return s.addUserError
 }
 
 func (s *mockService) Close() error {
@@ -274,14 +283,14 @@ func TestEmailEndpoint_ValidNew(t *testing.T) {
 		t.Errorf("Expected non-empty ID")
 	}
 
-	// Verify UpdateUser was called
-	if !svc.updateUserCalled {
-		t.Errorf("Expected UpdateUser to be called")
+	// Verify AddUser was called (instead of UpdateUser, since we've updated the implementation)
+	if !svc.addUserCalled {
+		t.Errorf("Expected AddUser to be called")
 	}
 
 	// Verify email was normalized
-	if svc.updateUserPayload != nil && svc.updateUserPayload.Email != "new@example.com" {
-		t.Errorf("Expected email to be normalized to 'new@example.com', got %s", svc.updateUserPayload.Email)
+	if svc.addUserPayload != nil && svc.addUserPayload.Email != "new@example.com" {
+		t.Errorf("Expected email to be normalized to 'new@example.com', got %s", svc.addUserPayload.Email)
 	}
 }
 

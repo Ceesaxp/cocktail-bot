@@ -122,7 +122,7 @@ func (r *SQLiteRepository) FindByEmail(ctx any, email string) (*domain.User, err
 	}, nil
 }
 
-// UpdateUser updates user information (primarily for marking cocktail as redeemed)
+// UpdateUser updates an existing user information (primarily for marking cocktail as redeemed)
 func (r *SQLiteRepository) UpdateUser(ctx any, user *domain.User) error {
 	r.mu.Lock()
 	defer r.mu.Unlock()
@@ -156,6 +156,32 @@ func (r *SQLiteRepository) UpdateUser(ctx any, user *domain.User) error {
 		return domain.ErrUserNotFound
 	}
 
+	return nil
+}
+
+// AddUser adds a new user to the database
+func (r *SQLiteRepository) AddUser(ctx any, user *domain.User) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+
+	// Prepare consumed time for SQL
+	var consumedTime sql.NullTime
+	if user.Redeemed != nil {
+		consumedTime = sql.NullTime{
+			Time:  *user.Redeemed,
+			Valid: true,
+		}
+	}
+
+	// Insert new user
+	query := `INSERT INTO users (id, email, date_added, redeemed) VALUES (?, ?, ?, ?)`
+	_, err := r.db.Exec(query, user.ID, user.Email, user.DateAdded, consumedTime)
+	if err != nil {
+		r.logger.Error("Error adding user", "email", user.Email, "error", err)
+		return fmt.Errorf("database error: %w", err)
+	}
+
+	r.logger.Debug("User added to SQLite", "email", user.Email, "id", user.ID)
 	return nil
 }
 

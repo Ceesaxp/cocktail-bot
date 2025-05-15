@@ -51,6 +51,21 @@ func (r *mockRepository) UpdateUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+func (r *mockRepository) AddUser(ctx any, user *domain.User) error {
+	_, exists := r.users[user.Email]
+	if exists {
+		return nil // In our mock, let's just return success if user exists (could be different behavior in actual implementations)
+	}
+	// Add new user
+	userCopy := *user
+	if user.Redeemed != nil {
+		timeCopy := *user.Redeemed
+		userCopy.Redeemed = &timeCopy
+	}
+	r.users[user.Email] = &userCopy
+	return nil
+}
+
 func (r *mockRepository) Close() error {
 	return nil
 }
@@ -198,4 +213,64 @@ func TestRedeemCocktail(t *testing.T) {
 	if err != domain.ErrUserNotFound {
 		t.Errorf("Expected ErrUserNotFound, got: %v", err)
 	}
+}
+
+func TestAddUser(t *testing.T) {
+	// Create mock repository
+	mockRepo := newMockRepository()
+
+	// Create logger
+	l := logger.New("info")
+
+	// Create a test service
+	svc := service.NewForTest(mockRepo, ratelimit.New(10, 100), l)
+
+	// Using any as context
+	ctx := context.Background()
+
+	// Create a new user
+	newUser := &domain.User{
+		ID:        "test-add-user",
+		Email:     "newuser@example.com",
+		DateAdded: time.Now(),
+		Redeemed:  nil,
+	}
+
+	// Test adding a new user
+	err := svc.AddUser(ctx, newUser)
+	if err != nil {
+		t.Errorf("Failed to add new user: %v", err)
+	}
+
+	// Verify the user was added to the repository
+	addedUser, err := mockRepo.FindByEmail(ctx, "newuser@example.com")
+	if err != nil {
+		t.Errorf("Failed to find added user: %v", err)
+	}
+
+	if addedUser == nil || addedUser.ID != "test-add-user" {
+		t.Errorf("User should have been added correctly")
+	}
+
+	// Test adding a user with nil value
+	err = svc.AddUser(ctx, nil)
+	if err == nil {
+		t.Errorf("Expected error when adding nil user")
+	}
+
+	// Test adding a user that already exists
+	existingUser := &domain.User{
+		ID:        "different-id",
+		Email:     "newuser@example.com", // Same email as before
+		DateAdded: time.Now(),
+		Redeemed:  nil,
+	}
+
+	err = svc.AddUser(ctx, existingUser)
+	if err != nil {
+		t.Errorf("Failed when adding existing user: %v", err)
+	}
+
+	// The behavior here will depend on your implementation
+	// For our mock, we don't return an error for existing users
 }

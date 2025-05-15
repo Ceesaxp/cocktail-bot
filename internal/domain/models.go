@@ -26,5 +26,6 @@ func (u *User) Redeem() {
 type Repository interface {
 	FindByEmail(ctx any, email string) (*User, error)
 	UpdateUser(ctx any, user *User) error
+	AddUser(ctx any, user *User) error
 	Close() error
 }

@@ -34,6 +34,7 @@ type ServiceInterface interface {
 	CheckEmailStatus(ctx any, userID int64, email string) (string, *domain.User, error)
 	RedeemCocktail(ctx any, userID int64, email string) (time.Time, error)
 	UpdateUser(ctx any, user *domain.User) error
+	AddUser(ctx any, user *domain.User) error
 	Close() error
 }
 
@@ -244,8 +245,8 @@ func (s *Server) handleEmail(w http.ResponseWriter, r *http.Request) {
 		Redeemed:  nil,
 	}
 
-	// Store in database using service
-	if err := s.service.UpdateUser(ctx, newUser); err != nil {
+	// Store in database using service's AddUser method for new users
+	if err := s.service.AddUser(ctx, newUser); err != nil {
 		s.logger.Error("Error adding email to database", "email", email, "error", err)
 		s.writeErrorResponse(w, "Internal server error", http.StatusInternalServerError, "Error storing email")
 		return

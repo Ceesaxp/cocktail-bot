@@ -150,7 +150,46 @@ func (r *MongoDBRepository) UpdateUser(ctx any, user *domain.User) error {
 	return nil
 }
 
-// Close closes the repository
+// AddUser adds a new user to the database
+func (r *MongoDBRepository) AddUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
+
+	r.logger.Debug("Adding user to MongoDB", "email", user.Email)
+
+	// Check if user already exists
+	filter := bson.M{"email": user.Email}
+	count, err := r.collection.CountDocuments(context.Background(), filter)
+	if err != nil {
+		r.logger.Error("Error checking if user exists", "error", err)
+		return err
+	}
+	
+	if count > 0 {
+		r.logger.Debug("User already exists in MongoDB", "email", user.Email)
+		return errors.New("user already exists")
+	}
+
+	// Convert to MongoDB document
+	doc := mongoUser{
+		ID:        user.ID,
+		Email:     user.Email,
+		DateAdded: user.DateAdded,
+		Redeemed:  user.Redeemed,
+	}
+
+	// Insert document
+	_, err = r.collection.InsertOne(context.Background(), doc)
+	if err != nil {
+		r.logger.Error("Error adding user to MongoDB", "error", err)
+		return err
+	}
+
+	r.logger.Debug("User added to MongoDB", "email", user.Email)
+	return nil
+}
+
 func (r *MongoDBRepository) Close() error {
 	r.logger.Debug("Closing MongoDB repository")
 	if r.client != nil {

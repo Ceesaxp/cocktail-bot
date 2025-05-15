@@ -188,6 +188,53 @@ func (r *MySQLRepository) UpdateUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+// AddUser adds a new user to the database
+func (r *MySQLRepository) AddUser(ctx any, user *domain.User) error {
+	if user == nil {
+		return errors.New("user cannot be nil")
+	}
+
+	r.logger.Debug("Adding user to MySQL", "email", user.Email)
+
+	// Prepare transaction
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	
+	// Check if user already exists
+	var exists bool
+	err := r.db.QueryRowContext(ctxWithTimeout, "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", user.Email).Scan(&exists)
+	if err != nil {
+		r.logger.Error("Error checking if user exists", "error", err)
+		return err
+	}
+	
+	if exists {
+		r.logger.Debug("User already exists in MySQL", "email", user.Email)
+		return errors.New("user already exists")
+	}
+
+	// Insert new user
+	var query string
+	var args []interface{}
+	
+	if user.Redeemed != nil {
+		query = "INSERT INTO users(id, email, date_added, redeemed) VALUES(?, ?, ?, ?)"
+		args = []interface{}{user.ID, user.Email, user.DateAdded, user.Redeemed}
+	} else {
+		query = "INSERT INTO users(id, email, date_added, redeemed) VALUES(?, ?, ?, NULL)"
+		args = []interface{}{user.ID, user.Email, user.DateAdded}
+	}
+	
+	_, err = r.db.ExecContext(ctxWithTimeout, query, args...)
+	if err != nil {
+		r.logger.Error("Error adding user", "error", err)
+		return fmt.Errorf("failed to add user: %w", err)
+	}
+	
+	r.logger.Debug("User added to MySQL", "email", user.Email)
+	return nil
+}
+
 func (r *MySQLRepository) Close() error {
 	r.logger.Debug("Closing MySQL repository")
 	if r.db != nil {

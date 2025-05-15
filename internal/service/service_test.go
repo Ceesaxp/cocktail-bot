@@ -66,6 +66,47 @@ func (r *mockRepository) AddUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+func (r *mockRepository) GetReport(ctx any, params domain.ReportParams) ([]*domain.User, error) {
+	var results []*domain.User
+	
+	for _, user := range r.users {
+		// Apply date filter
+		if !user.DateAdded.Before(params.From) && !user.DateAdded.After(params.To) {
+			// Apply report type filter
+			switch params.Type {
+			case domain.ReportTypeRedeemed:
+				if user.Redeemed != nil {
+					// Make a deep copy to prevent mutation
+					userCopy := *user
+					if user.Redeemed != nil {
+						timeCopy := *user.Redeemed
+						userCopy.Redeemed = &timeCopy
+					}
+					results = append(results, &userCopy)
+				}
+			case domain.ReportTypeAdded:
+				// Make a deep copy to prevent mutation
+				userCopy := *user
+				if user.Redeemed != nil {
+					timeCopy := *user.Redeemed
+					userCopy.Redeemed = &timeCopy
+				}
+				results = append(results, &userCopy)
+			case domain.ReportTypeAll:
+				// Make a deep copy to prevent mutation
+				userCopy := *user
+				if user.Redeemed != nil {
+					timeCopy := *user.Redeemed
+					userCopy.Redeemed = &timeCopy
+				}
+				results = append(results, &userCopy)
+			}
+		}
+	}
+	
+	return results, nil
+}
+
 func (r *mockRepository) Close() error {
 	return nil
 }
@@ -273,4 +314,128 @@ func TestAddUser(t *testing.T) {
 
 	// The behavior here will depend on your implementation
 	// For our mock, we don't return an error for existing users
+}
+
+func TestGenerateReport(t *testing.T) {
+	// Create mock repository
+	mockRepo := newMockRepository()
+
+	// Add test users with different dates and redemption statuses
+	now := time.Now()
+	yesterday := now.AddDate(0, 0, -1)
+	lastWeek := now.AddDate(0, 0, -7)
+	lastMonth := now.AddDate(0, -1, 0)
+	
+	// User added today, not redeemed
+	mockRepo.users["today@example.com"] = &domain.User{
+		ID:        "1",
+		Email:     "today@example.com",
+		DateAdded: now,
+		Redeemed:  nil,
+	}
+	
+	// User added yesterday, redeemed
+	redeemedTime := now.Add(-12 * time.Hour)
+	mockRepo.users["yesterday@example.com"] = &domain.User{
+		ID:        "2",
+		Email:     "yesterday@example.com",
+		DateAdded: yesterday,
+		Redeemed:  &redeemedTime,
+	}
+	
+	// User added last week, redeemed
+	lastWeekRedeem := lastWeek.Add(24 * time.Hour)
+	mockRepo.users["lastweek@example.com"] = &domain.User{
+		ID:        "3",
+		Email:     "lastweek@example.com",
+		DateAdded: lastWeek,
+		Redeemed:  &lastWeekRedeem,
+	}
+	
+	// User added last month, not redeemed
+	mockRepo.users["lastmonth@example.com"] = &domain.User{
+		ID:        "4",
+		Email:     "lastmonth@example.com",
+		DateAdded: lastMonth,
+		Redeemed:  nil,
+	}
+
+	// Create logger and service
+	l := logger.New("info")
+	svc := service.NewForTest(mockRepo, ratelimit.New(10, 100), l)
+	ctx := context.Background()
+
+	// Test cases
+	testCases := []struct {
+		name           string
+		reportType     string
+		from           time.Time
+		to             time.Time
+		expectedCount  int
+		expectedEmails []string
+	}{
+		{
+			name:           "All users in last week",
+			reportType:     "all",
+			from:           now.AddDate(0, 0, -7),
+			to:             now,
+			expectedCount:  3,
+			expectedEmails: []string{"today@example.com", "yesterday@example.com", "lastweek@example.com"},
+		},
+		{
+			name:           "Only redeemed users",
+			reportType:     "redeemed",
+			from:           now.AddDate(0, 0, -30),
+			to:             now,
+			expectedCount:  2,
+			expectedEmails: []string{"yesterday@example.com", "lastweek@example.com"},
+		},
+		{
+			name:           "Users added yesterday",
+			reportType:     "added",
+			from:           yesterday,
+			to:             yesterday.AddDate(0, 0, 1),
+			expectedCount:  2,
+			expectedEmails: []string{"today@example.com", "yesterday@example.com"},
+		},
+		{
+			name:           "Empty result for future date range",
+			reportType:     "all",
+			from:           now.AddDate(0, 0, 1),
+			to:             now.AddDate(0, 0, 2),
+			expectedCount:  0,
+			expectedEmails: []string{},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			users, err := svc.GenerateReport(ctx, tc.reportType, tc.from, tc.to)
+			if err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if len(users) != tc.expectedCount {
+				t.Errorf("Expected %d users, got %d", tc.expectedCount, len(users))
+			}
+
+			// Check if we got the expected emails
+			emails := make(map[string]bool)
+			for _, user := range users {
+				emails[user.Email] = true
+			}
+
+			for _, expectedEmail := range tc.expectedEmails {
+				if !emails[expectedEmail] {
+					t.Errorf("Expected to find email %s in results, but it wasn't found", expectedEmail)
+				}
+			}
+		})
+	}
+
+	// Test invalid report type
+	_, err := svc.GenerateReport(ctx, "invalid", now.AddDate(0, 0, -7), now)
+	if err == nil {
+		t.Errorf("Expected error for invalid report type, got nil")
+	}
 }

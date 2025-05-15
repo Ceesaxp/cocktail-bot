@@ -190,6 +190,72 @@ func (r *MongoDBRepository) AddUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+// GetReport retrieves users based on the report parameters
+func (r *MongoDBRepository) GetReport(ctx any, params domain.ReportParams) ([]*domain.User, error) {
+	r.logger.Debug("Generating report from MongoDB", "type", params.Type, "from", params.From, "to", params.To)
+
+	// Create date filter
+	dateFilter := bson.M{
+		"date_added": bson.M{
+			"$gte": params.From,
+			"$lte": params.To,
+		},
+	}
+
+	// Add report type filter
+	var filter bson.M
+	switch params.Type {
+	case domain.ReportTypeRedeemed:
+		// Only get users who have redeemed within the date range
+		filter = bson.M{
+			"$and": []bson.M{
+				dateFilter,
+				{"redeemed": bson.M{"$ne": nil}},
+			},
+		}
+	case domain.ReportTypeAdded, domain.ReportTypeAll:
+		// Get all users within the date range
+		filter = dateFilter
+	default:
+		return nil, errors.New("invalid report type")
+	}
+
+	// Set up options (sorting by date added, newest first)
+	findOptions := options.Find().SetSort(bson.M{"date_added": -1})
+
+	// Execute query with timeout
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	
+	cursor, err := r.collection.Find(ctxWithTimeout, filter, findOptions)
+	if err != nil {
+		r.logger.Error("Failed to execute MongoDB query", "error", err)
+		return nil, err
+	}
+	defer cursor.Close(ctxWithTimeout)
+
+	// Process results
+	var mongoUsers []mongoUser
+	if err = cursor.All(ctxWithTimeout, &mongoUsers); err != nil {
+		r.logger.Error("Failed to decode MongoDB results", "error", err)
+		return nil, err
+	}
+
+	// Convert to domain objects
+	users := make([]*domain.User, len(mongoUsers))
+	for i, mongoUser := range mongoUsers {
+		users[i] = &domain.User{
+			ID:        mongoUser.ID,
+			Email:     mongoUser.Email,
+			DateAdded: mongoUser.DateAdded,
+			Redeemed:  mongoUser.Redeemed,
+		}
+	}
+
+	r.logger.Info("Report generated from MongoDB", "type", params.Type, "count", len(users))
+	return users, nil
+}
+
 func (r *MongoDBRepository) Close() error {
 	r.logger.Debug("Closing MongoDB repository")
 	if r.client != nil {

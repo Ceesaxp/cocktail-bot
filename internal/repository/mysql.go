@@ -235,6 +235,98 @@ func (r *MySQLRepository) AddUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+// GetReport retrieves users based on the report parameters
+func (r *MySQLRepository) GetReport(ctx any, params domain.ReportParams) ([]*domain.User, error) {
+	r.logger.Debug("Generating report from MySQL", "type", params.Type, "from", params.From, "to", params.To)
+
+	var query string
+	var args []interface{}
+
+	// Build different queries based on report type
+	switch params.Type {
+	case domain.ReportTypeRedeemed:
+		// Only get users who have redeemed within the date range
+		query = `
+			SELECT id, email, date_added, redeemed 
+			FROM users 
+			WHERE date_added >= ? AND date_added <= ? 
+			AND redeemed IS NOT NULL
+			ORDER BY date_added DESC
+		`
+		args = []interface{}{params.From, params.To}
+	case domain.ReportTypeAdded:
+		// Get users added within the date range
+		query = `
+			SELECT id, email, date_added, redeemed 
+			FROM users 
+			WHERE date_added >= ? AND date_added <= ?
+			ORDER BY date_added DESC
+		`
+		args = []interface{}{params.From, params.To}
+	case domain.ReportTypeAll:
+		// Get all users
+		query = `
+			SELECT id, email, date_added, redeemed 
+			FROM users
+			WHERE date_added >= ? AND date_added <= ?
+			ORDER BY date_added DESC
+		`
+		args = []interface{}{params.From, params.To}
+	default:
+		return nil, fmt.Errorf("invalid report type: %s", params.Type)
+	}
+
+	// Execute query with timeout
+	ctxWithTimeout, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	rows, err := r.db.QueryContext(ctxWithTimeout, query, args...)
+	if err != nil {
+		r.logger.Error("Failed to execute report query", "error", err)
+		return nil, fmt.Errorf("database error: %w", err)
+	}
+	defer rows.Close()
+
+	// Process results
+	var users []*domain.User
+	for rows.Next() {
+		var (
+			id            string
+			email         string
+			dateAdded     time.Time
+			redeemedTime  sql.NullTime
+		)
+
+		if err := rows.Scan(&id, &email, &dateAdded, &redeemedTime); err != nil {
+			r.logger.Error("Error scanning row", "error", err)
+			return nil, fmt.Errorf("error scanning row: %w", err)
+		}
+
+		// Create user object
+		user := &domain.User{
+			ID:        id,
+			Email:     email,
+			DateAdded: dateAdded,
+		}
+
+		// Handle redeemed time
+		if redeemedTime.Valid {
+			t := redeemedTime.Time
+			user.Redeemed = &t
+		}
+
+		users = append(users, user)
+	}
+
+	if err := rows.Err(); err != nil {
+		r.logger.Error("Error iterating rows", "error", err)
+		return nil, fmt.Errorf("error iterating rows: %w", err)
+	}
+
+	r.logger.Info("Report generated from MySQL", "type", params.Type, "count", len(users))
+	return users, nil
+}
+
 func (r *MySQLRepository) Close() error {
 	r.logger.Debug("Closing MySQL repository")
 	if r.db != nil {

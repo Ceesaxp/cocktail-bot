@@ -265,6 +265,105 @@ func (r *GoogleSheetRepository) AddUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+// GetReport retrieves users based on the report parameters
+func (r *GoogleSheetRepository) GetReport(ctx any, params domain.ReportParams) ([]*domain.User, error) {
+	r.logger.Debug("Generating report from Google Sheets", "type", params.Type, "from", params.From, "to", params.To)
+
+	// Define the range to read
+	readRange := fmt.Sprintf("%s!A:D", r.sheetName)
+
+	// Read data from sheet
+	resp, err := r.service.Spreadsheets.Values.Get(r.spreadsheetID, readRange).Context(context.Background()).Do()
+	if err != nil {
+		r.logger.Error("Failed to read Google Sheet for report", "error", err)
+		return nil, domain.ErrDatabaseUnavailable
+	}
+
+	if len(resp.Values) == 0 {
+		r.logger.Debug("Sheet is empty", "sheet", r.sheetName)
+		return []*domain.User{}, nil
+	}
+
+	var users []*domain.User
+
+	// Skip header and process rows
+	for i, row := range resp.Values {
+		if i == 0 { // Skip header
+			continue
+		}
+
+		if len(row) < 2 {
+			continue // Skip invalid rows
+		}
+
+		// Extract user data
+		var user domain.User
+
+		// Get ID
+		if id, ok := row[0].(string); ok {
+			user.ID = id
+		} else {
+			continue // Skip row without ID
+		}
+
+		// Get Email
+		if email, ok := row[1].(string); ok {
+			user.Email = email
+		} else {
+			continue // Skip row without email
+		}
+
+		// Parse DateAdded
+		var dateAdded time.Time
+		if len(row) >= 3 {
+			if dateStr, ok := row[2].(string); ok && dateStr != "" {
+				parsedDate, err := time.Parse(time.RFC3339, dateStr)
+				if err == nil {
+					dateAdded = parsedDate
+					user.DateAdded = parsedDate
+				} else {
+					continue // Skip row with invalid date
+				}
+			} else {
+				continue // Skip row without date
+			}
+		} else {
+			continue // Skip row without date
+		}
+
+		// Parse Redeemed
+		if len(row) >= 4 {
+			if redeemedStr, ok := row[3].(string); ok && redeemedStr != "" {
+				redeemed, err := time.Parse(time.RFC3339, redeemedStr)
+				if err == nil {
+					user.Redeemed = &redeemed
+				}
+			}
+		}
+
+		// Apply date range filter
+		if !dateAdded.Before(params.From) && !dateAdded.After(params.To) {
+			// Apply report type filter
+			switch params.Type {
+			case domain.ReportTypeRedeemed:
+				// Include only redeemed records
+				if user.Redeemed != nil {
+					users = append(users, &user)
+				}
+			case domain.ReportTypeAdded:
+				// Include all records within the date range
+				users = append(users, &user)
+			case domain.ReportTypeAll:
+				// Include all records
+				users = append(users, &user)
+			}
+		}
+	}
+
+	r.logger.Info("Report generated from Google Sheets", "type", params.Type, "count", len(users))
+	return users, nil
+}
+
 func (r *GoogleSheetRepository) Close() error {
 	r.logger.Debug("Closing Google Sheets repository")
 	// No explicit close method for Google Sheets API client

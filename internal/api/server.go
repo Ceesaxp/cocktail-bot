@@ -35,6 +35,7 @@ type ServiceInterface interface {
 	RedeemCocktail(ctx any, userID int64, email string) (time.Time, error)
 	UpdateUser(ctx any, user *domain.User) error
 	AddUser(ctx any, user *domain.User) error
+	GenerateReport(ctx any, reportType string, fromDate, toDate time.Time) ([]*domain.User, error)
 	Close() error
 }
 
@@ -55,6 +56,16 @@ type ErrorResponse struct {
 	Error   string `json:"error"`
 	Code    int    `json:"code"`
 	Details string `json:"details,omitempty"`
+}
+
+// ReportResponse represents the JSON response for report requests
+type ReportResponse struct {
+	Type      string         `json:"type"`
+	From      string         `json:"from"`
+	To        string         `json:"to"`
+	Count     int            `json:"count"`
+	Users     []*domain.User `json:"users,omitempty"`
+	Generated time.Time      `json:"generated"`
 }
 
 // New creates a new API server
@@ -93,6 +104,9 @@ func New(cfg *config.Config, svc ServiceInterface, log *logger.Logger) (*Server,
 
 	// Register routes
 	mux.HandleFunc("/api/v1/email", server.handleEmail)
+	mux.HandleFunc("/api/v1/report/redeemed", server.handleReportRedeemed)
+	mux.HandleFunc("/api/v1/report/added", server.handleReportAdded)
+	mux.HandleFunc("/api/v1/report/all", server.handleReportAll)
 	mux.HandleFunc("/api/health", server.handleHealth)
 
 	return server, nil
@@ -262,6 +276,156 @@ func (s *Server) handleEmail(w http.ResponseWriter, r *http.Request) {
 		Message: "Email added successfully",
 	}
 	s.writeJSONResponse(w, response, http.StatusCreated)
+}
+
+// handleReportRedeemed handles the redeemed report endpoint
+func (s *Server) handleReportRedeemed(w http.ResponseWriter, r *http.Request) {
+	s.handleReport(w, r, "redeemed")
+}
+
+// handleReportAdded handles the added report endpoint
+func (s *Server) handleReportAdded(w http.ResponseWriter, r *http.Request) {
+	s.handleReport(w, r, "added")
+}
+
+// handleReportAll handles the all report endpoint
+func (s *Server) handleReportAll(w http.ResponseWriter, r *http.Request) {
+	s.handleReport(w, r, "all")
+}
+
+// handleReport is a generic handler for all report types
+func (s *Server) handleReport(w http.ResponseWriter, r *http.Request, reportType string) {
+	// Only allow GET method
+	if r.Method != http.MethodGet {
+		s.writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed, "Only GET method is allowed")
+		return
+	}
+
+	// Authenticate request
+	apiKey := r.Header.Get("Authorization")
+	if len(apiKey) > 7 && strings.HasPrefix(strings.ToLower(apiKey), "bearer ") {
+		apiKey = apiKey[7:] // Remove 'Bearer ' prefix
+	}
+
+	if !s.authProvider.Authenticate(apiKey) {
+		s.writeErrorResponse(w, "Unauthorized", http.StatusUnauthorized, "Invalid or missing authentication token")
+		return
+	}
+
+	// Apply rate limiting
+	clientIP := getClientIP(r)
+	clientID := int64(HashCode(clientIP))
+
+	if !s.limiter.Allow(clientID) {
+		s.writeErrorResponse(w, "Too Many Requests", http.StatusTooManyRequests, "Rate limit exceeded")
+		return
+	}
+
+	// Parse date range parameters
+	fromDate, toDate, err := parseDateParams(r)
+	if err != nil {
+		s.writeErrorResponse(w, "Invalid date format", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	// Set content type
+	format := r.URL.Query().Get("format")
+	if format == "" {
+		format = "json" // Default format is JSON
+	}
+
+	// Generate report
+	ctx := context.Background()
+	users, err := s.service.GenerateReport(ctx, reportType, fromDate, toDate)
+	if err != nil {
+		s.logger.Error("Error generating report", "type", reportType, "error", err)
+		s.writeErrorResponse(w, "Internal server error", http.StatusInternalServerError, "Error generating report")
+		return
+	}
+
+	// Format-specific response
+	if format == "csv" {
+		s.writeCSVReport(w, users, reportType)
+	} else {
+		// Prepare JSON response
+		response := ReportResponse{
+			Type:      reportType,
+			From:      fromDate.Format(time.RFC3339),
+			To:        toDate.Format(time.RFC3339),
+			Count:     len(users),
+			Users:     users,
+			Generated: time.Now(),
+		}
+		s.writeJSONResponse(w, response, http.StatusOK)
+	}
+}
+
+// writeCSVReport writes the report as a CSV file
+func (s *Server) writeCSVReport(w http.ResponseWriter, users []*domain.User, reportType string) {
+	// Set headers for CSV download
+	w.Header().Set("Content-Type", "text/csv")
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-report-%s.csv\"", 
+		reportType, time.Now().Format("2006-01-02")))
+	
+	// Write CSV header
+	if _, err := w.Write([]byte("ID,Email,DateAdded,Redeemed\n")); err != nil {
+		s.logger.Error("Error writing CSV header", "error", err)
+		return
+	}
+	
+	// Write each row
+	for _, user := range users {
+		redeemedStr := ""
+		if user.Redeemed != nil {
+			redeemedStr = user.Redeemed.Format(time.RFC3339)
+		}
+		
+		row := fmt.Sprintf("%s,%s,%s,%s\n", 
+			user.ID, 
+			user.Email, 
+			user.DateAdded.Format(time.RFC3339), 
+			redeemedStr)
+		
+		if _, err := w.Write([]byte(row)); err != nil {
+			s.logger.Error("Error writing CSV row", "error", err)
+			return
+		}
+	}
+}
+
+// parseDateParams parses the from and to query parameters
+func parseDateParams(r *http.Request) (time.Time, time.Time, error) {
+	// Default dates (last 7 days)
+	fromDate := time.Now().AddDate(0, 0, -7)
+	toDate := time.Now()
+	
+	// Parse 'from' parameter if provided
+	fromParam := r.URL.Query().Get("from")
+	if fromParam != "" {
+		parsedFrom, err := time.Parse("2006-01-02", fromParam)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid 'from' date format. Use YYYY-MM-DD")
+		}
+		fromDate = parsedFrom
+	}
+	
+	// Parse 'to' parameter if provided
+	toParam := r.URL.Query().Get("to")
+	if toParam != "" {
+		parsedTo, err := time.Parse("2006-01-02", toParam)
+		if err != nil {
+			return time.Time{}, time.Time{}, fmt.Errorf("invalid 'to' date format. Use YYYY-MM-DD")
+		}
+		// Set time to end of day for inclusive range
+		toDate = parsedTo.Add(24*time.Hour - time.Second)
+	}
+	
+	// Validate date range
+	if fromDate.After(toDate) {
+		return time.Time{}, time.Time{}, fmt.Errorf("'from' date cannot be after 'to' date")
+	}
+	
+	return fromDate, toDate, nil
 }
 
 // handleHealth handles the health check endpoint

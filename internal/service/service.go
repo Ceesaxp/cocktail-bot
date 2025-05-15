@@ -165,6 +165,47 @@ func (s *Service) AddUser(ctx any, user *domain.User) error {
 	return nil
 }
 
+// GenerateReport retrieves users based on report parameters
+func (s *Service) GenerateReport(ctx any, reportType string, fromDate, toDate time.Time) ([]*domain.User, error) {
+	// Validate report type
+	validReportType, err := domain.ValidateReportType(reportType)
+	if err != nil {
+		s.logger.Error("Invalid report type", "report_type", reportType, "error", err)
+		return nil, err
+	}
+
+	// Log the operation
+	s.logger.Info("Generating report", "type", validReportType, "from", fromDate, "to", toDate)
+
+	// Set default date range if not provided
+	if fromDate.IsZero() {
+		// Default to 7 days ago
+		fromDate = time.Now().AddDate(0, 0, -7)
+	}
+
+	if toDate.IsZero() {
+		// Default to now
+		toDate = time.Now()
+	}
+
+	// Create report parameters
+	params := domain.ReportParams{
+		Type: validReportType,
+		From: fromDate,
+		To:   toDate,
+	}
+
+	// Get report from repository
+	users, err := s.repo.GetReport(ctx, params)
+	if err != nil {
+		s.logger.Error("Error generating report", "type", validReportType, "error", err)
+		return nil, err
+	}
+
+	s.logger.Info("Report generated successfully", "type", validReportType, "count", len(users))
+	return users, nil
+}
+
 // Close closes the service and its dependencies
 func (s *Service) Close() error {
 	return s.repo.Close()

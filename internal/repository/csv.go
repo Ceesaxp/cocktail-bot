@@ -3,6 +3,7 @@ package repository
 import (
 	"encoding/csv"
 	"errors"
+	"io"
 	"os"
 	"strings"
 	"time"
@@ -259,6 +260,105 @@ func (r *CSVRepository) AddUser(ctx any, user *domain.User) error {
 	
 	r.logger.Debug("User added to CSV", "email", user.Email)
 	return nil
+}
+
+// GetReport retrieves users based on the report parameters
+func (r *CSVRepository) GetReport(ctx any, params domain.ReportParams) ([]*domain.User, error) {
+	r.logger.Debug("Generating report from CSV", "type", params.Type, "from", params.From, "to", params.To)
+
+	// Open file for reading
+	file, err := os.Open(r.filePath)
+	if err != nil {
+		r.logger.Error("Failed to open CSV file for report", "error", err)
+		return nil, domain.ErrDatabaseUnavailable
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+
+	// Read header
+	_, err = reader.Read()
+	if err != nil {
+		r.logger.Error("Failed to read CSV header", "error", err)
+		return nil, err
+	}
+
+	var users []*domain.User
+
+	// Read all rows
+	for {
+		record, err := reader.Read()
+		if err != nil {
+			if err == io.EOF {
+				break
+			}
+			r.logger.Error("Error reading CSV record", "error", err)
+			return nil, err
+		}
+
+		// Parse user data
+		if len(record) < 4 {
+			continue // Skip invalid records
+		}
+
+		// Parse DateAdded
+		var dateAdded time.Time
+		if record[2] != "" {
+			parsedDate, err := time.Parse(time.RFC3339, record[2])
+			if err != nil {
+				r.logger.Debug("Invalid date format for DateAdded", "value", record[2], "error", err)
+				continue // Skip invalid date
+			}
+			dateAdded = parsedDate
+		} else {
+			continue // Skip if date added is empty
+		}
+
+		// Parse Redeemed
+		var redeemed *time.Time
+		if record[3] != "" {
+			parsedRedeemed, err := time.Parse(time.RFC3339, record[3])
+			if err == nil {
+				redeemed = &parsedRedeemed
+			}
+		}
+
+		// Apply date filters
+		if !dateAdded.Before(params.From) && !dateAdded.After(params.To) {
+			// Apply report type filter
+			switch params.Type {
+			case domain.ReportTypeRedeemed:
+				// Include only redeemed records
+				if redeemed != nil {
+					users = append(users, &domain.User{
+						ID:        record[0],
+						Email:     record[1],
+						DateAdded: dateAdded,
+						Redeemed:  redeemed,
+					})
+				}
+			case domain.ReportTypeAdded:
+				// Include all records within the date range
+				users = append(users, &domain.User{
+					ID:        record[0],
+					Email:     record[1],
+					DateAdded: dateAdded,
+					Redeemed:  redeemed,
+				})
+			case domain.ReportTypeAll:
+				// Include all records
+				users = append(users, &domain.User{
+					ID:        record[0],
+					Email:     record[1],
+					DateAdded: dateAdded,
+					Redeemed:  redeemed,
+				})
+			}
+		}
+	}
+
+	r.logger.Info("Report generated from CSV", "type", params.Type, "count", len(users))
+	return users, nil
 }
 
 func (r *CSVRepository) Close() error {

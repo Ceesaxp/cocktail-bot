@@ -290,11 +290,6 @@ func (c *Config) LoadAuthTokens() error {
 		return nil
 	}
 
-	// If we already have tokens from environment variables, use those
-	if len(c.API.AuthTokens) > 0 {
-		return nil
-	}
-
 	// If tokens file is not specified, try to create a default one
 	if c.API.TokensFile == "" {
 		// Default to api_tokens.yaml in the current directory
@@ -303,7 +298,7 @@ func (c *Config) LoadAuthTokens() error {
 
 	// Check if the file exists
 	if _, err := os.Stat(c.API.TokensFile); os.IsNotExist(err) {
-		// If the file doesn't exist and we're in a container, we don't treat this as an error
+		// If the file doesn't exist, we don't treat this as an error
 		// because we might be using environment variables instead
 		return nil
 	}
@@ -326,9 +321,24 @@ func (c *Config) LoadAuthTokens() error {
 		return err
 	}
 
-	// Update config with loaded tokens
+	// If we have tokens from the file and no tokens from environment variables,
+	// or if we prefer file tokens over environment variables, use the file tokens
 	if len(tokensConfig.AuthTokens) > 0 {
-		c.API.AuthTokens = tokensConfig.AuthTokens
+		if len(c.API.AuthTokens) == 0 || os.Getenv(envPrefix+"PREFER_FILE_TOKENS") == "true" {
+			c.API.AuthTokens = tokensConfig.AuthTokens
+		} else {
+			// Merge tokens from file with existing tokens
+			tokenMap := make(map[string]bool)
+			for _, t := range c.API.AuthTokens {
+				tokenMap[t] = true
+			}
+
+			for _, t := range tokensConfig.AuthTokens {
+				if !tokenMap[t] {
+					c.API.AuthTokens = append(c.API.AuthTokens, t)
+				}
+			}
+		}
 	}
 
 	return nil

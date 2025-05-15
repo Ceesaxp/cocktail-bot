@@ -7,8 +7,10 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/ceesaxp/cocktail-bot/internal/config"
@@ -27,6 +29,8 @@ type Server struct {
 	limiter      *ratelimit.Limiter
 	authProvider *AuthProvider
 	running      bool
+	tokenMutex   sync.RWMutex
+	stopWatcher  chan struct{}
 }
 
 // ServiceInterface defines the required methods from the service layer
@@ -82,11 +86,13 @@ func New(cfg *config.Config, svc ServiceInterface, log *logger.Logger) (*Server,
 			Addr:    fmt.Sprintf(":%d", cfg.API.Port),
 			Handler: mux,
 		},
+		stopWatcher: nil,
 	}
 
 	// Register routes
 	mux.HandleFunc("/api/v1/email", server.handleEmail)
 	mux.HandleFunc("/api/health", server.handleHealth)
+	mux.HandleFunc("/api/reload-tokens", server.handleReloadTokens)
 
 	return server, nil
 }
@@ -106,6 +112,10 @@ func (s *Server) Start() error {
 	s.running = true
 	s.logger.Info("Starting API server", "port", s.config.API.Port)
 
+	// Start the token file watcher
+	s.stopWatcher = make(chan struct{})
+	go s.watchTokensFile()
+
 	// Start server in a separate goroutine
 	go func() {
 		if err := s.httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
@@ -123,6 +133,11 @@ func (s *Server) Stop() error {
 	}
 
 	s.logger.Info("Stopping API server")
+
+	// Stop the token file watcher
+	if s.stopWatcher != nil {
+		close(s.stopWatcher)
+	}
 
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -329,4 +344,96 @@ func HashCode(s string) int64 {
 func GenerateUniqueID() string {
 	now := time.Now()
 	return fmt.Sprintf("api_%d", now.UnixNano())
+}
+
+// watchTokensFile watches the tokens file for changes and reloads it when it changes
+func (s *Server) watchTokensFile() {
+	// Set up file checking at a regular interval
+	ticker := time.NewTicker(30 * time.Second)
+	defer ticker.Stop()
+
+	// Get the initial file info
+	var lastModTime time.Time
+	tokensFile := s.config.API.TokensFile
+
+	if info, err := os.Stat(tokensFile); err == nil {
+		lastModTime = info.ModTime()
+	}
+
+	for {
+		select {
+		case <-ticker.C:
+			// Check if the file has changed
+			info, err := os.Stat(tokensFile)
+			if err != nil {
+				s.logger.Error("Error checking tokens file", "file", tokensFile, "error", err)
+				continue
+			}
+
+			// If the file has been modified, reload the tokens
+			if info.ModTime().After(lastModTime) {
+				s.logger.Info("Tokens file changed, reloading", "file", tokensFile)
+				if err := s.reloadTokens(); err != nil {
+					s.logger.Error("Error reloading tokens", "error", err)
+				} else {
+					lastModTime = info.ModTime()
+				}
+			}
+		case <-s.stopWatcher:
+			return
+		}
+	}
+}
+
+// reloadTokens reloads the tokens from the file
+func (s *Server) reloadTokens() error {
+	// Reload tokens from file
+	if err := s.config.LoadAuthTokens(); err != nil {
+		return err
+	}
+
+	// Update auth provider with new tokens
+	s.tokenMutex.Lock()
+	defer s.tokenMutex.Unlock()
+
+	// Create a new auth provider with the updated tokens
+	s.authProvider = NewAuthProvider(s.config.API.AuthTokens)
+	s.logger.Info("Tokens reloaded", fmt.Sprintf("%v", s.config.API.AuthTokens))
+	return nil
+}
+
+// handleReloadTokens handles the manual token reload endpoint
+func (s *Server) handleReloadTokens(w http.ResponseWriter, r *http.Request) {
+	// Only allow POST method
+	if r.Method != http.MethodPost {
+		s.writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed, "Only POST method is allowed")
+		return
+	}
+
+	// Authenticate request (only admin can reload tokens)
+	apiKey := r.Header.Get("Authorization")
+	if len(apiKey) > 7 && strings.HasPrefix(strings.ToLower(apiKey), "bearer ") {
+		apiKey = apiKey[7:] // Remove 'Bearer ' prefix
+	}
+
+	if !s.authProvider.Authenticate(apiKey) {
+		s.writeErrorResponse(w, "Unauthorized", http.StatusUnauthorized, "Invalid or missing authentication token")
+		return
+	}
+
+	// Reload tokens
+	if err := s.reloadTokens(); err != nil {
+		s.writeErrorResponse(w, "Internal server error", http.StatusInternalServerError, fmt.Sprintf("Error reloading tokens: %v", err))
+		return
+	}
+
+	// Return success
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(map[string]string{
+		"status":  "ok",
+		"message": "Tokens reloaded successfully",
+	}); err != nil {
+		s.logger.Error("Error encoding token reload response", "error", err)
+	}
 }

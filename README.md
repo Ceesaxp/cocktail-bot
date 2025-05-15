@@ -67,17 +67,28 @@ go build -o cocktail-bot ./cmd/bot
 
 ## Docker
 
-Build the Docker image:
+Build the Docker image with SQLite support:
 
 ```bash
+# For AMD64 (Linux servers)
 docker build -t cocktail-bot .
+
+# For Apple Silicon (M1/M2 Mac)
+docker build --platform linux/arm64 -t cocktail-bot:local .
 ```
 
 Run the container:
 
 ```bash
-docker run -v $(pwd)/config.yaml:/app/config.yaml -v $(pwd)/data:/app/data cocktail-bot
+# Make sure the data directory exists and has correct permissions
+mkdir -p ./data
+chmod 777 ./data
+
+# Run the container
+docker run -v $(pwd)/config.yaml:/app/config.yaml -v $(pwd)/data:/app/data -p 8080:8080 cocktail-bot
 ```
+
+> **Note**: The Docker image includes SQLite support enabled through CGO.
 
 ## Database Options
 

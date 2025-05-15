@@ -1,7 +1,7 @@
 FROM golang:1.23-alpine AS builder
 
-# Install necessary packages
-RUN apk add --no-cache git make
+# Install necessary packages for SQLite and building
+RUN apk add --no-cache git make gcc musl-dev sqlite-dev
 
 # Set working directory
 WORKDIR /app
@@ -13,14 +13,14 @@ RUN go mod download
 # Copy source code
 COPY . .
 
-# Build the application
-RUN CGO_ENABLED=0 go build -o cocktail-bot ./cmd/bot
+# Build the application with CGO enabled for SQLite support
+RUN CGO_ENABLED=1 go build -o cocktail-bot ./cmd/bot
 
 # Create final lightweight image
 FROM alpine:3.18
 
-# Install ca-certificates for HTTPS connections
-RUN apk add --no-cache ca-certificates tzdata
+# Install runtime dependencies for SQLite and HTTPS
+RUN apk add --no-cache ca-certificates tzdata sqlite
 
 # Set working directory
 WORKDIR /app

@@ -47,6 +47,8 @@ Add the following secrets to your GitHub repository:
 3. Create the application directory:
    ```bash
    sudo mkdir -p /srv/cocktail-bot/data
+   # Ensure correct permissions for SQLite database
+   sudo chmod 777 /srv/cocktail-bot/data
    ```
 
 4. Create a configuration file:
@@ -61,8 +63,8 @@ Add the following secrets to your GitHub repository:
      token: "YOUR_TELEGRAM_BOT_TOKEN"
      user: "your_bot_username"
    database:
-     type: "sqlite"  # or other supported types
-     connection_string: "/app/data/users.db"
+     type: "sqlite"
+     connection_string: "/app/data/users.sqlite"
    rate_limiting:
      requests_per_minute: 10
      requests_per_hour: 100
@@ -74,13 +76,19 @@ Add the following secrets to your GitHub repository:
      rate_limit_per_hour: 300
    ```
 
+> **Note**: The Docker image is built with SQLite support enabled. The connection string path `/app/data/users.sqlite` refers to the path inside the container, which is mapped to `/srv/cocktail-bot/data` on the host system.
+
 ## Manual Deployment
 
 If you need to deploy manually without using the CI/CD pipeline:
 
-1. Build the Docker image locally:
+1. Build the Docker image locally (with SQLite support):
    ```bash
-   docker build -t ceesaxp/cocktail-bot:latest .
+   # For AMD64 (Digital Ocean droplet)
+   docker build --platform linux/amd64 -t ceesaxp/cocktail-bot:latest .
+   
+   # If building on Apple Silicon (M1/M2 Mac) for testing locally
+   docker build --platform linux/arm64 -t ceesaxp/cocktail-bot:local .
    ```
 
 2. Push the image to Docker Hub:
@@ -103,6 +111,13 @@ If you need to deploy manually without using the CI/CD pipeline:
      --restart unless-stopped \
      ceesaxp/cocktail-bot:latest
    ```
+   
+5. Verify the container is running properly:
+   ```bash
+   docker logs cocktail-bot
+   ```
+   
+   You should see log output indicating the bot has connected to Telegram and the SQLite database has been initialized successfully.
 
 ## Triggering Deployment with GitHub Actions
 

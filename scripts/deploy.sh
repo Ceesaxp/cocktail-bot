@@ -80,6 +80,7 @@ fi
 log "Setting correct permissions"
 sudo chown -R root:root $APP_DIR
 sudo chmod -R 755 $APP_DIR
+sudo chmod -R 777 $DATA_DIR  # Ensure SQLite has write permissions
 
 # Pull latest image
 log "Pulling latest Docker image"

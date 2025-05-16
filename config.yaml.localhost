@@ -1,0 +1,49 @@
+# Cocktail Bot Configuration for localhost deployment with Caddy
+# Generated for running behind Caddy reverse proxy
+
+# Log level (debug, info, warn, error)
+log_level: info
+
+# Telegram settings
+telegram:
+  # Bot token (get from BotFather)
+  token: "YOUR_TELEGRAM_BOT_TOKEN"
+  # Bot username
+  user: "your_bot_username"
+
+# Database settings
+database:
+  # Database type (csv, sqlite, googlesheet, postgresql, mysql, mongodb)
+  type: "sqlite"
+  # Connection string or path
+  connection_string: "./data/users.db"
+
+# Rate limiting settings
+rate_limiting:
+  # Maximum requests per minute per user
+  requests_per_minute: 10
+  # Maximum requests per hour per user
+  requests_per_hour: 100
+
+# Language settings
+language:
+  # Default language code (en, es, fr, de, ru, sr)
+  default_language: "en"
+  # List of enabled languages
+  enabled:
+    - "en" # English
+    - "es" # Spanish
+    - "fr" # French
+    - "de" # German
+    - "ru" # Russian
+    # - "sr"  # Serbian (uncomment to enable)
+
+# API settings - IMPORTANT: Set to listen on localhost only for Caddy reverse proxy
+api:
+  enabled: true
+  # Listen only on localhost interface
+  host: "127.0.0.1"
+  port: 8080
+  tokens_file: "api_tokens.yaml"
+  rate_limit_per_min: 30
+  rate_limit_per_hour: 300

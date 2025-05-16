@@ -52,6 +52,7 @@ type LanguageConfig struct {
 // APIConfig holds REST API configuration
 type APIConfig struct {
 	Enabled          bool     `yaml:"enabled"`
+	Host             string   `yaml:"host"`
 	Port             int      `yaml:"port"`
 	AuthTokens       []string `yaml:"auth_tokens"`
 	TokensFile       string   `yaml:"tokens_file"`
@@ -78,6 +79,7 @@ func New() *Config {
 		},
 		API: APIConfig{
 			Enabled:          false,
+			Host:             "", // Empty means listen on all interfaces
 			Port:             8080,
 			AuthTokens:       []string{},
 			TokensFile:       "./api_tokens.yaml",
@@ -177,6 +179,9 @@ func loadFromEnvironment(cfg *Config) {
 	// API
 	if value := os.Getenv(envPrefix + "API_ENABLED"); value != "" {
 		cfg.API.Enabled = strings.ToLower(value) == "true" || value == "1"
+	}
+	if value := os.Getenv(envPrefix + "API_HOST"); value != "" {
+		cfg.API.Host = value
 	}
 	if value := os.Getenv(envPrefix + "API_PORT"); value != "" {
 		if intValue, err := strconv.Atoi(value); err == nil && intValue > 0 {

@@ -1,0 +1,55 @@
+cocktailbot.ceesaxp.org {
+    # Enable TLS with automatic HTTPS
+    tls internal
+
+    # Log settings
+    log {
+        output file /var/log/caddy/cocktailbot.log
+        format json
+    }
+
+    # Reverse proxy to the cocktail bot API running on localhost:8080
+    reverse_proxy localhost:8080 {
+        # Pass client IP headers to backend
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+
+        # Health checks
+        health_uri /api/health
+        health_interval 30s
+        health_timeout 10s
+        health_status 200
+    }
+
+    # Basic security headers
+    header {
+        # Enable HTTP Strict Transport Security (HSTS)
+        Strict-Transport-Security "max-age=31536000; includeSubDomains; preload"
+
+        # Prevent MIME type sniffing
+        X-Content-Type-Options "nosniff"
+
+        # Configure Content-Security-Policy
+        Content-Security-Policy "default-src 'self'; frame-ancestors 'none';"
+
+        # Prevent clickjacking
+        X-Frame-Options "DENY"
+
+        # Enable XSS protection
+        X-XSS-Protection "1; mode=block"
+
+        # Remove server info
+        -Server
+    }
+
+    # Handle errors
+    handle_errors {
+        respond "{http.error.status_code} {http.error.status_text}" {http.error.status_code}
+    }
+}
+
+# Redirect www subdomain to non-www
+www.cocktailbot.ceesaxp.org {
+    redir https://cocktailbot.ceesaxp.org{uri} permanent
+}

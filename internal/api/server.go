@@ -90,6 +90,10 @@ func New(cfg *config.Config, svc ServiceInterface, log *logger.Logger) (*Server,
 
 	mux := http.NewServeMux()
 
+	// Configure bind address
+	bindAddr := fmt.Sprintf("%s:%d", cfg.API.Host, cfg.API.Port)
+	log.Info("API will bind to", "address", bindAddr)
+
 	server := &Server{
 		config:       cfg,
 		logger:       log,
@@ -97,7 +101,7 @@ func New(cfg *config.Config, svc ServiceInterface, log *logger.Logger) (*Server,
 		limiter:      limiter,
 		authProvider: authProvider,
 		httpServer: &http.Server{
-			Addr:    fmt.Sprintf(":%d", cfg.API.Port),
+			Addr:    bindAddr,
 			Handler: mux,
 		},
 	}

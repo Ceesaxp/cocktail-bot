@@ -1,0 +1,159 @@
+name: Improved CI/CD Pipeline
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+  workflow_dispatch:
+    inputs:
+      deploy:
+        description: "Deploy to production?"
+        required: true
+        default: "false"
+        type: choice
+        options:
+          - "true"
+          - "false"
+
+jobs:
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: "1.23"
+
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: go mod download
+
+      - name: Run tests
+        run: go test -v ./...
+
+      - name: Run linter
+        uses: golangci/golangci-lint-action@v3
+        with:
+          version: latest
+
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: test
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to DockerHub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Extract metadata for Docker
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ceesaxp/cocktail-bot
+          tags: |
+            type=raw,value=latest,enable=${{ github.ref == format('refs/heads/{0}', github.event.repository.default_branch) }}
+            type=ref,event=branch
+            type=ref,event=pr
+            type=semver,pattern={{version}}
+            type=sha,format=short
+
+      - name: Build and push image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+          build-args: |
+            CGO_ENABLED=1
+
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: build
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.deploy == 'true'
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      # Using improved SSH agent setup
+      - name: Install SSH key
+        uses: webfactory/ssh-agent@v0.8.0
+        with:
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+      # Add server host key to known hosts
+      - name: Add known hosts
+        run: |
+          echo "${{ secrets.SSH_KNOWN_HOSTS }}" >> ~/.ssh/known_hosts
+
+      # Setup environment variables
+      - name: Setup environment variables
+        run: |
+          echo "DROPLET_IP=${{ secrets.DROPLET_IP }}" >> $GITHUB_ENV
+          echo "DEPLOY_USER=${{ secrets.DEPLOY_USER }}" >> $GITHUB_ENV
+          
+      # Set up environment variables for the deployment script
+      - name: Set up deployment environment variables
+        run: |
+          echo "TELEGRAM_BOT_TOKEN=${{ secrets.TELEGRAM_BOT_TOKEN }}" >> $GITHUB_ENV
+          echo "TELEGRAM_BOT_USERNAME=${{ secrets.TELEGRAM_BOT_USERNAME }}" >> $GITHUB_ENV
+          echo "DATABASE_TYPE=${{ secrets.DATABASE_TYPE }}" >> $GITHUB_ENV
+          echo "DATABASE_CONNECTION_STRING=${{ secrets.DATABASE_CONNECTION_STRING }}" >> $GITHUB_ENV
+
+      # Copy deployment script to server with retry mechanism
+      - name: Copy deployment script to server
+        run: |
+          for i in {1..3}; do
+            if scp -o StrictHostKeyChecking=no ./scripts/deploy.sh ${{ env.DEPLOY_USER }}@${{ env.DROPLET_IP }}:/tmp/deploy.sh; then
+              echo "Successfully copied deployment script"
+              break
+            else
+              echo "Failed to copy deployment script, attempt $i/3"
+              if [ $i -eq 3 ]; then
+                echo "Failed to copy deployment script after 3 attempts"
+                exit 1
+              fi
+              sleep 5
+            fi
+          done
+
+      # Execute deployment script with retry mechanism
+      - name: Execute deployment script
+        run: |
+          for i in {1..3}; do
+            if ssh -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DROPLET_IP }} "export TELEGRAM_BOT_TOKEN='${{ env.TELEGRAM_BOT_TOKEN }}' && export TELEGRAM_BOT_USERNAME='${{ env.TELEGRAM_BOT_USERNAME }}' && export DATABASE_TYPE='${{ env.DATABASE_TYPE }}' && export DATABASE_CONNECTION_STRING='${{ env.DATABASE_CONNECTION_STRING }}' && chmod +x /tmp/deploy.sh && /tmp/deploy.sh"; then
+              echo "Successfully executed deployment script"
+              break
+            else
+              echo "Failed to execute deployment script, attempt $i/3"
+              if [ $i -eq 3 ]; then
+                echo "Failed to execute deployment script after 3 attempts"
+                exit 1
+              fi
+              sleep 10
+            fi
+          done
+          
+      # Verify deployment
+      - name: Verify deployment
+        run: |
+          echo "Verifying deployment..."
+          sleep 10
+          ssh -o StrictHostKeyChecking=no ${{ env.DEPLOY_USER }}@${{ env.DROPLET_IP }} "systemctl is-active --quiet cocktail-bot && echo 'Service is running' || echo 'Service is not running'"

@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  cocktail-bot:
+    image: ${REGISTRY:-ceesaxp}/cocktail-bot:${TAG:-latest}
+    container_name: cocktail-bot
+    restart: unless-stopped
+    depends_on:
+      - mongodb
+    environment:
+      # Log settings
+      - COCKTAILBOT_LOG_LEVEL=info
+      
+      # Telegram settings
+      - COCKTAILBOT_TELEGRAM_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - COCKTAILBOT_TELEGRAM_USER=${TELEGRAM_BOT_USERNAME}
+      
+      # Database settings
+      - COCKTAILBOT_DATABASE_TYPE=mongodb
+      - COCKTAILBOT_DATABASE_CONNECTION_STRING=mongodb://cocktailbot:${MONGODB_PASSWORD}@mongodb:27017/cocktailbot?authSource=admin
+      
+      # Rate limiting
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_MINUTE=10
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_HOUR=100
+      
+      # Language settings
+      - COCKTAILBOT_LANGUAGE_DEFAULT=en
+      - COCKTAILBOT_LANGUAGE_ENABLED=en,es,fr,de,ru
+      
+      # API settings
+      - COCKTAILBOT_API_ENABLED=true
+      - COCKTAILBOT_API_HOST=127.0.0.1
+      - COCKTAILBOT_API_PORT=8080
+      - COCKTAILBOT_API_TOKENS=${API_TOKENS}
+      - COCKTAILBOT_API_RATE_LIMIT_PER_MIN=30
+      - COCKTAILBOT_API_RATE_LIMIT_PER_HOUR=300
+    volumes:
+      - ./data:/app/data
+    networks:
+      - cocktail-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mongodb:
+    image: mongo:6-jammy
+    container_name: cocktail-mongodb
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=cocktailbot
+      - MONGO_INITDB_ROOT_USERNAME=cocktailbot
+      - MONGO_INITDB_ROOT_PASSWORD=${MONGODB_PASSWORD}
+    volumes:
+      - mongodb-data:/data/db
+      - ./db/schema/init/mongodb:/docker-entrypoint-initdb.d
+    networks:
+      - cocktail-net
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "'db.adminCommand(\"ping\").ok'", "localhost:27017/admin", "-u", "cocktailbot", "-p", "${MONGODB_PASSWORD}", "--authenticationDatabase", "admin"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.7
+    container_name: cocktail-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - ./logs/caddy:/var/log/caddy
+    depends_on:
+      - cocktail-bot
+    networks:
+      - cocktail-net
+
+networks:
+  cocktail-net:
+    driver: bridge
+
+volumes:
+  mongodb-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

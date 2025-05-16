@@ -1,0 +1,96 @@
+version: '3.8'
+
+services:
+  cocktail-bot:
+    image: ${REGISTRY:-ceesaxp}/cocktail-bot:${TAG:-latest}
+    container_name: cocktail-bot
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      # Log settings
+      - COCKTAILBOT_LOG_LEVEL=info
+      
+      # Telegram settings
+      - COCKTAILBOT_TELEGRAM_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - COCKTAILBOT_TELEGRAM_USER=${TELEGRAM_BOT_USERNAME}
+      
+      # Database settings
+      - COCKTAILBOT_DATABASE_TYPE=mysql
+      - COCKTAILBOT_DATABASE_CONNECTION_STRING=cocktailbot:${MYSQL_PASSWORD}@tcp(mysql:3306)/cocktailbot?parseTime=true
+      
+      # Rate limiting
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_MINUTE=10
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_HOUR=100
+      
+      # Language settings
+      - COCKTAILBOT_LANGUAGE_DEFAULT=en
+      - COCKTAILBOT_LANGUAGE_ENABLED=en,es,fr,de,ru
+      
+      # API settings
+      - COCKTAILBOT_API_ENABLED=true
+      - COCKTAILBOT_API_HOST=127.0.0.1
+      - COCKTAILBOT_API_PORT=8080
+      - COCKTAILBOT_API_TOKENS=${API_TOKENS}
+      - COCKTAILBOT_API_RATE_LIMIT_PER_MIN=30
+      - COCKTAILBOT_API_RATE_LIMIT_PER_HOUR=300
+    volumes:
+      - ./data:/app/data
+    networks:
+      - cocktail-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mysql:
+    image: mysql:8.0
+    container_name: cocktail-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=cocktailbot
+      - MYSQL_USER=cocktailbot
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/schema/init/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - cocktail-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.7
+    container_name: cocktail-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - ./logs/caddy:/var/log/caddy
+    depends_on:
+      - cocktail-bot
+    networks:
+      - cocktail-net
+
+networks:
+  cocktail-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

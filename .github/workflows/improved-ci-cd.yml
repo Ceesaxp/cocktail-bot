@@ -78,7 +78,7 @@ jobs:
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
-          cache-to: type=gha,mode=max
+          cache-to: type=gha,mode=min
           platforms: linux/amd64
           build-args: |
             CGO_ENABLED=1
@@ -108,7 +108,7 @@ jobs:
         run: |
           echo "DROPLET_IP=${{ secrets.DROPLET_IP }}" >> $GITHUB_ENV
           echo "DEPLOY_USER=${{ secrets.DEPLOY_USER }}" >> $GITHUB_ENV
-          
+
       # Set up environment variables for the deployment script
       - name: Set up deployment environment variables
         run: |
@@ -150,7 +150,7 @@ jobs:
               sleep 10
             fi
           done
-          
+
       # Verify deployment
       - name: Verify deployment
         run: |

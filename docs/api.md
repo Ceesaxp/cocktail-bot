@@ -164,6 +164,127 @@ Adds a new email address to the database.
 }
 ```
 
+### Generate Reports
+
+The following endpoints allow you to generate reports about users in various formats.
+
+#### Common Parameters for All Report Endpoints
+
+- **from** (optional): Start date for the report in YYYY-MM-DD format. Defaults to 7 days ago.
+- **to** (optional): End date for the report in YYYY-MM-DD format. Defaults to current date.
+- **format** (optional): Response format, either "json" (default) or "csv".
+
+#### Redeemed Users Report
+
+```
+GET /api/v1/report/redeemed
+```
+
+Returns users who have redeemed their cocktails within the specified date range.
+
+#### Added Users Report
+
+```
+GET /api/v1/report/added
+```
+
+Returns users who were added to the system within the specified date range.
+
+#### All Users Report
+
+```
+GET /api/v1/report/all
+```
+
+Returns all users within the specified date range.
+
+#### JSON Response Example
+
+**Successful Response (200 OK):**
+
+```json
+{
+  "type": "redeemed",
+  "from": "2023-01-01T00:00:00Z",
+  "to": "2023-12-31T23:59:59Z",
+  "count": 2,
+  "users": [
+    {
+      "ID": "user_123",
+      "Email": "user1@example.com",
+      "DateAdded": "2023-01-15T10:30:00Z",
+      "Redeemed": "2023-01-16T14:20:00Z"
+    },
+    {
+      "ID": "user_456",
+      "Email": "user2@example.com",
+      "DateAdded": "2023-02-20T08:45:00Z",
+      "Redeemed": "2023-02-21T17:10:00Z"
+    }
+  ],
+  "generated": "2023-05-10T15:30:00Z"
+}
+```
+
+#### CSV Response Example
+
+When using `format=csv`, the response will be a downloadable CSV file with the following format:
+
+```
+ID,Email,DateAdded,Redeemed
+user_123,user1@example.com,2023-01-15T10:30:00Z,2023-01-16T14:20:00Z
+user_456,user2@example.com,2023-02-20T08:45:00Z,2023-02-21T17:10:00Z
+```
+
+The Content-Disposition header will be set to `attachment; filename="redeemed-report-2023-05-10.csv"`.
+
+#### Error Responses
+
+1. Authentication error (401 Unauthorized):
+```json
+{
+  "error": "Unauthorized",
+  "code": 401,
+  "details": "Invalid or missing authentication token"
+}
+```
+
+2. Invalid date format (400 Bad Request):
+```json
+{
+  "error": "Invalid date format",
+  "code": 400,
+  "details": "invalid 'from' date format. Use YYYY-MM-DD"
+}
+```
+
+3. Invalid date range (400 Bad Request):
+```json
+{
+  "error": "Invalid date format",
+  "code": 400,
+  "details": "'from' date cannot be after 'to' date"
+}
+```
+
+4. Rate limit exceeded (429 Too Many Requests):
+```json
+{
+  "error": "Too Many Requests",
+  "code": 429,
+  "details": "Rate limit exceeded"
+}
+```
+
+5. Server error (500 Internal Server Error):
+```json
+{
+  "error": "Internal server error",
+  "code": 500,
+  "details": "Error generating report"
+}
+```
+
 ## Configuration
 
 The API is configured in the `config.yaml` file under the `api` section:

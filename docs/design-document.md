@@ -11,6 +11,8 @@ The Telegram Cocktail Bot validates user emails against a database and provides 
 5. Configurable database backend
 6. Containerized deployment with Alpine Linux
 7. Comprehensive event logging
+8. REST API with authentication for programmatic access
+9. Report generation with CSV export capabilities
 
 ## Domain Model
 
@@ -47,6 +49,16 @@ The Telegram Cocktail Bot validates user emails against a database and provides 
    - Enforces configurable rate limits
    - Returns friendly message when limit exceeded
 
+6. **API Email Submission Flow**
+   - External system sends email via API with authentication
+   - System validates email and adds to database
+   - System returns success/error response
+
+7. **Report Generation Flow**
+   - External system requests report via API with authentication
+   - System filters data based on report type and date range
+   - System returns data in JSON or CSV format according to request
+
 ## Technical Architecture
 
 ### Components
@@ -55,32 +67,42 @@ The Telegram Cocktail Bot validates user emails against a database and provides 
    - Formats responses
    - Processes /start command
 
-2. **Email Validator**
+2. **REST API**
+   - Token-based authentication
+   - Email submission endpoint
+   - Report generation endpoints with format options
+   - Rate limiting per client
+
+3. **Email Validator**
    - Checks email format before database lookup
    - Converts email to lowercase for comparison
 
-3. **Rate Limiter**
-   - Tracks request frequency by user ID
-   - Enforces configurable limits
+4. **Rate Limiter**
+   - Tracks request frequency by user ID or client IP
+   - Enforces configurable limits for bot and API
 
-4. **Database Adapter**
+5. **Database Adapter**
    - Abstract interface for database operations
    - Concrete implementations for each supported database type
    - Error handling for database unavailability
+   - Report generation capabilities
 
-5. **Business Logic**
+6. **Business Logic**
    - Email validation
    - Redemption status checking
    - Update operations
+   - Report filtering and generation
 
-6. **Configuration Manager**
+7. **Configuration Manager**
    - Loading database configuration from file and/or environment variables
    - Telegram token management
+   - API token management
    - Rate limit settings
 
-7. **Logger**
+8. **Logger**
    - Records email lookups and redemptions
    - Timestamps and user identifiers
+   - API request logging
 
 ### Database Schema
 ```
@@ -109,6 +131,14 @@ RateLimiting {
   RequestsPerMinute: int
   RequestsPerHour: int
 }
+
+API {
+  Enabled: bool
+  Port: int
+  TokensFile: string
+  RateLimitPerMin: int
+  RateLimitPerHour: int
+}
 ```
 
 ## Implementation Approach
@@ -123,6 +153,8 @@ RateLimiting {
 - Database drivers for supported backends
 - Configuration management (viper or similar)
 - Structured logging (zap or zerolog)
+- HTTP server for REST API (net/http or Gorilla Mux)
+- Authentication middleware for API security
 
 ### Docker Deployment
 - Alpine-based image for minimal size
@@ -137,7 +169,7 @@ RateLimiting {
 
 ## Usage Examples
 
-### User Interaction
+### User Interaction via Telegram Bot
 1. User sends: `/start`
    - Bot: "Welcome to the Cocktail Bot! Send your email to check if you're eligible for a free cocktail."
 
@@ -162,6 +194,38 @@ RateLimiting {
 
 8. Database unavailable:
    - Bot: "Sorry, our system is temporarily unavailable. Please try again later."
+   
+### REST API Interaction
+
+1. Adding a new email:
+```bash
+curl -X POST http://your-server:8080/api/v1/email \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer your-api-token" \
+  -d '{"email": "user@example.com"}'
+```
+
+2. Getting a report of redeemed cocktails:
+```bash
+curl "http://your-server:8080/api/v1/report/redeemed?from=2023-01-01&to=2023-12-31" \
+  -H "Authorization: Bearer your-api-token"
+```
+
+3. Getting a report in CSV format:
+```bash
+curl "http://your-server:8080/api/v1/report/all?format=csv" \
+  -H "Authorization: Bearer your-api-token" \
+  -o users_report.csv
+```
+
+4. Managing API tokens:
+```bash
+# Add a new token
+./scripts/manage-api-tokens.sh add new-token-value
+
+# List all available tokens
+./scripts/manage-api-tokens.sh list
+```
 
 ## Implementation Plan
 1. Set up project structure following domain-driven design
@@ -171,6 +235,8 @@ RateLimiting {
 5. Add email validation and rate limiting
 6. Implement logging system
 7. Create configuration system
-8. Build Docker deployment
-9. Write tests for all components
-10. Document API and deployment instructions
+8. Implement REST API with authentication
+9. Add report generation functionality with multiple formats
+10. Build Docker deployment
+11. Write tests for all components
+12. Document API and deployment instructions

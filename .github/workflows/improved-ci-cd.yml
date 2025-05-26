@@ -116,6 +116,9 @@ jobs:
           echo "TELEGRAM_BOT_USERNAME=${{ secrets.TELEGRAM_BOT_USERNAME }}" >> $GITHUB_ENV
           echo "DATABASE_TYPE=${{ secrets.DATABASE_TYPE }}" >> $GITHUB_ENV
           echo "DATABASE_CONNECTION_STRING=${{ secrets.DATABASE_CONNECTION_STRING }}" >> $GITHUB_ENV
+          echo "MYSQL_ROOT_PASSWORD=${{ secrets.MYSQL_ROOT_PASSWORD }}" >> $GITHUB_ENV
+          echo "MYSQL_PASSWORD=${{ secrets.MYSQL_PASSWORD }}" >> $GITHUB_ENV
+          echo "API_TOKENS=${{ secrets.API_TOKENS }}" >> $GITHUB_ENV
 
       # Copy deployment script to server with retry mechanism
       - name: Copy deployment script to server

@@ -1,60 +1,106 @@
 services:
   cocktail-bot:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      platforms:
-        - linux/arm64
-    image: ceesaxp/cocktail-bot:local
+    image: ${REGISTRY:-ceesaxp}/cocktail-bot:${TAG:-latest}
     container_name: cocktail-bot
-    volumes:
-      - ./config.yaml:/app/config.yaml
-      - ./data:/app/data
-      - ./api_tokens.yaml:/app/api_tokens.yaml
-    ports:
-      - "8080:8080"
     restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      # Log settings
+      - COCKTAILBOT_LOG_LEVEL=info
+
+      # Telegram settings
+      - COCKTAILBOT_TELEGRAM_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - COCKTAILBOT_TELEGRAM_USER=${TELEGRAM_BOT_USERNAME}
+
+      # Database settings
+      - COCKTAILBOT_DATABASE_TYPE=mysql
+      - COCKTAILBOT_DATABASE_CONNECTION_STRING=cocktailbot:${MYSQL_PASSWORD}@tcp(mysql:3306)/cocktailbot?parseTime=true
+
+      # Rate limiting
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_MINUTE=10
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_HOUR=100
+
+      # Language settings
+      - COCKTAILBOT_LANGUAGE_DEFAULT=en
+      - COCKTAILBOT_LANGUAGE_ENABLED=en,es,fr,de,ru
+
+      # API settings
+      - COCKTAILBOT_API_ENABLED=true
+      - COCKTAILBOT_API_HOST=127.0.0.1
+      - COCKTAILBOT_API_PORT=8080
+      - COCKTAILBOT_API_TOKENS=${API_TOKENS}
+      - COCKTAILBOT_API_RATE_LIMIT_PER_MIN=30
+      - COCKTAILBOT_API_RATE_LIMIT_PER_HOUR=300
+    volumes:
+      - ./data:/app/data
+      - ./config.yaml:/app/config.yaml
     networks:
       - cocktail-net
+    healthcheck:
+      test:
+        ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mysql:
+    image: mariadb:latest
+    container_name: cocktail-mysql
+    restart: unless-stopped
     environment:
-      - COCKTAILBOT_API_ENABLED=true
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=cocktailbot
+      - MYSQL_USER=cocktailbot
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/schema/init/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - cocktail-net
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "mysqladmin",
+          "ping",
+          "-h",
+          "localhost",
+          "-u",
+          "root",
+          "-p${MYSQL_ROOT_PASSWORD}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
 
-  # Uncomment this service if you want to use PostgreSQL as your database
-  # postgres:
-  #   image: postgres:15-alpine
-  #   container_name: cocktail-postgres
-  #   environment:
-  #     POSTGRES_DB: cocktailbot
-  #     POSTGRES_USER: botuser
-  #     POSTGRES_PASSWORD: botpassword
-  #   volumes:
-  #     - postgres-data:/var/lib/postgresql/data
-  #   ports:
-  #     - "5432:5432"
-  #   restart: unless-stopped
-  #   networks:
-  #     - cocktail-net
-
-  # Uncomment this service if you want to use MongoDB as your database
-  # mongodb:
-  #   image: mongo:6-jammy
-  #   container_name: cocktail-mongodb
-  #   environment:
-  #     MONGO_INITDB_DATABASE: cocktailbot
-  #     MONGO_INITDB_ROOT_USERNAME: botuser
-  #     MONGO_INITDB_ROOT_PASSWORD: botpassword
-  #   volumes:
-  #     - mongodb-data:/data/db
-  #   ports:
-  #     - "27017:27017"
-  #   restart: unless-stopped
-  #   networks:
-  #     - cocktail-net
+  caddy:
+    image: caddy:2.7
+    container_name: cocktail-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - ./logs/caddy:/var/log/caddy
+    depends_on:
+      - cocktail-bot
+    networks:
+      - cocktail-net
 
 networks:
   cocktail-net:
     driver: bridge
 
 volumes:
-  postgres-data:
-  mongodb-data:
+  mysql-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local

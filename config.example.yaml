@@ -14,9 +14,9 @@ telegram:
 # Database settings
 database:
   # Database type (csv, sqlite, googlesheet, postgresql, mysql, mongodb)
-  type: "sqlite"
-  # Connection string or path
-  connection_string: "./data/users.db"
+  type: "mysql"
+  # Connection string or DSN (for MySQL/MariaDB)
+  connection_string: "cocktailbot:your_mysql_password@tcp(mysql:3306)/cocktailbot?parseTime=true"
 
   # Additional examples:
   # CSV:

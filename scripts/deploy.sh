@@ -58,6 +58,117 @@ EOF
   sudo mv /tmp/config.yaml $CONFIG_FILE
 fi
 
+# If deploying with MySQL (MariaDB) via Docker Compose, generate compose files and exit
+if [ "$DATABASE_TYPE" = "mysql" ]; then
+  log "Generating docker-compose.yml for MySQL/MariaDB deployment"
+  sudo tee $APP_DIR/docker-compose.yml > /dev/null << 'EOF'
+services:
+  cocktail-bot:
+    image: ${REGISTRY:-ceesaxp}/cocktail-bot:${TAG:-latest}
+    container_name: cocktail-bot
+    restart: unless-stopped
+    depends_on:
+      - mysql
+    environment:
+      - COCKTAILBOT_LOG_LEVEL=info
+
+      - COCKTAILBOT_TELEGRAM_TOKEN=${TELEGRAM_BOT_TOKEN}
+      - COCKTAILBOT_TELEGRAM_USER=${TELEGRAM_BOT_USERNAME}
+
+      - COCKTAILBOT_DATABASE_TYPE=mysql
+      - COCKTAILBOT_DATABASE_CONNECTION_STRING=cocktailbot:${MYSQL_PASSWORD}@tcp(mysql:3306)/cocktailbot?parseTime=true
+
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_MINUTE=10
+      - COCKTAILBOT_RATE_LIMITING_REQUESTS_PER_HOUR=100
+
+      - COCKTAILBOT_LANGUAGE_DEFAULT=en
+      - COCKTAILBOT_LANGUAGE_ENABLED=en,es,fr,de,ru
+
+      - COCKTAILBOT_API_ENABLED=true
+      - COCKTAILBOT_API_HOST=127.0.0.1
+      - COCKTAILBOT_API_PORT=8080
+      - COCKTAILBOT_API_TOKENS=${API_TOKEN}
+      - COCKTAILBOT_API_RATE_LIMIT_PER_MIN=30
+      - COCKTAILBOT_API_RATE_LIMIT_PER_HOUR=300
+    volumes:
+      - $APP_DIR/data:/app/data
+      - $CONFIG_FILE:/app/config.yaml
+    networks:
+      - cocktail-net
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:8080/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  mysql:
+    image: mariadb:latest
+    container_name: cocktail-mysql
+    restart: unless-stopped
+    environment:
+      - MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+      - MYSQL_DATABASE=cocktailbot
+      - MYSQL_USER=cocktailbot
+      - MYSQL_PASSWORD=${MYSQL_PASSWORD}
+    volumes:
+      - mysql-data:/var/lib/mysql
+      - ./db/schema/init/mysql:/docker-entrypoint-initdb.d
+    networks:
+      - cocktail-net
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${MYSQL_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  caddy:
+    image: caddy:2.7
+    container_name: cocktail-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+      - ./logs/caddy:/var/log/caddy
+    depends_on:
+      - cocktail-bot
+    networks:
+      - cocktail-net
+
+networks:
+  cocktail-net:
+    driver: bridge
+
+volumes:
+  mysql-data:
+    driver: local
+  caddy-data:
+    driver: local
+  caddy-config:
+    driver: local
+EOF
+
+  log "Writing .env file for Docker Compose"
+  sudo tee $APP_DIR/.env > /dev/null << EOF
+TELEGRAM_BOT_TOKEN=${TELEGRAM_BOT_TOKEN}
+TELEGRAM_BOT_USERNAME=${TELEGRAM_BOT_USERNAME}
+MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}
+MYSQL_PASSWORD=${MYSQL_PASSWORD}
+API_TOKENS=${API_TOKEN}
+EOF
+
+  log "Starting Docker Compose services"
+  cd $APP_DIR
+  sudo docker-compose up -d
+  log "Docker Compose deployment completed successfully"
+  exit 0
+fi
+
 # Create systemd service if it doesn't exist
 if [ ! -f "/etc/systemd/system/$SERVICE_NAME.service" ]; then
   log "Creating systemd service"

@@ -14,9 +14,9 @@ telegram:
 # Database settings
 database:
   # Database type (csv, sqlite, googlesheet, postgresql, mysql, mongodb)
-  type: "csv"
-  # Connection string or path
-  connection_string: "./data/users.csv"
+  type: "mysql"
+  # Connection string or DSN (for MySQL/MariaDB)
+  connection_string: "cocktailbot:your_mysql_password@tcp(mysql:3306)/cocktailbot?parseTime=true"
 
 # Rate limiting settings
 rate_limiting:

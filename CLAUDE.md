@@ -61,14 +61,12 @@ make lint
 ### Docker
 
 ```bash
-# Build Docker image
-make docker
+# Deployment with Docker Compose (MySQL + Caddy)
+# Copy environment variables template and update values
+cp .env.example .env
 
-# Run with Docker
-make docker-run
-
-# Run with Docker Compose
-make docker-compose
+# Build images and start services
+docker-compose up -d
 ```
 
 ### Project Setup
@@ -83,7 +81,7 @@ make sample-csv
 
 ## Configuration
 
-Configuration is handled via `config.yaml` file or environment variables with `COCKTAILBOT_` prefix:
+Configuration is handled via `config.yaml` file or environment variables with `COCKTAILBOT_` prefix (overridden by Docker Compose `.env` settings):
 
 ```yaml
 log_level: info
@@ -91,8 +89,8 @@ telegram:
   token: "YOUR_TELEGRAM_BOT_TOKEN"
   user: "your_bot_username"
 database:
-  type: "csv"  # csv, googlesheet, postgresql, mysql, mongodb
-  connection_string: "./data/users.csv"
+  type: "mysql"  # mysql, postgresql, sqlite, csv, googlesheet, mongodb
+  connection_string: "cocktailbot:your_mysql_password@tcp(mysql:3306)/cocktailbot?parseTime=true"
 rate_limiting:
   requests_per_minute: 10
   requests_per_hour: 100

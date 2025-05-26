@@ -67,35 +67,27 @@ go build -o cocktail-bot ./cmd/bot
 ./cocktail-bot --config config.yaml
 ```
 
-## Docker
+## Docker Compose Deployment
 
-Build the Docker image with SQLite support:
+This repository includes a `docker-compose.yml` that sets up the Cocktail Bot with a MySQL (MariaDB) backend and Caddy as a reverse proxy. Service behavior and credentials are driven by a `.env` file.
 
-```bash
-# For AMD64 (Linux servers)
-docker build -t cocktail-bot .
+1. Copy the environment variables template and update it:
+   ```bash
+   cp .env.example .env
+   # Edit .env to set your TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME,
+   # MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD, and API_TOKENS values.
+   ```
 
-# For Apple Silicon (M1/M2 Mac)
-docker build --platform linux/arm64 -t cocktail-bot:local .
-```
+2. Start the services:
+   ```bash
+   docker-compose up -d
+   ```
 
-Run the container:
-
-```bash
-# Make sure the data directory exists and has correct permissions
-mkdir -p ./data
-chmod 777 ./data
-
-# Run the container
-docker run \
-  -v $(pwd)/config.yaml:/app/config.yaml \
-  -v $(pwd)/data:/app/data \
-  -p 8080:8080 \
-  -e COCKTAILBOT_API_TOKENS="token1,token2,token3" \
-  cocktail-bot
-```
-
-> **Note**: The Docker image includes SQLite support enabled through CGO.
+3. Verify the services are healthy:
+   ```bash
+   docker-compose ps
+   docker logs cocktail-bot --tail 20
+   ```
 
 ## Database Options
 

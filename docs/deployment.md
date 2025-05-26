@@ -118,6 +118,26 @@ If you need to deploy manually without using the CI/CD pipeline:
    ```
    
    You should see log output indicating the bot has connected to Telegram and the SQLite database has been initialized successfully.
+## Docker Compose MySQL Deployment
+
+Alternatively, you can deploy the application with MySQL (MariaDB) and Caddy using Docker Compose:
+
+1. Copy the environment variables template to `.env` and update your values:
+   ```bash
+   cp .env.example .env
+   # Edit .env to set TELEGRAM_BOT_TOKEN, TELEGRAM_BOT_USERNAME,
+   # MYSQL_ROOT_PASSWORD, MYSQL_PASSWORD, and API_TOKENS
+   ```
+2. Ensure `docker-compose.yml` and `.env` are present on your droplet (e.g., via `scp` or git clone).
+3. Start the services:
+   ```bash
+   docker-compose up -d
+   ```
+4. Verify the services are healthy:
+   ```bash
+   docker-compose ps
+   docker logs cocktail-bot --tail 20
+   ```
 
 ## Triggering Deployment with GitHub Actions
 

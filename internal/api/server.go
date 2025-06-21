@@ -75,7 +75,7 @@ func New(cfg *config.Config, svc ServiceInterface, log *logger.Logger) (*Server,
 		log.Warn("Error loading auth tokens from file", "error", err)
 		// Continue with tokens from config.yaml
 	}
-	
+
 	if len(cfg.API.AuthTokens) == 0 {
 		log.Warn("No API tokens configured - API authentication will be unavailable")
 	} else {
@@ -368,28 +368,28 @@ func (s *Server) handleReport(w http.ResponseWriter, r *http.Request, reportType
 func (s *Server) writeCSVReport(w http.ResponseWriter, users []*domain.User, reportType string) {
 	// Set headers for CSV download
 	w.Header().Set("Content-Type", "text/csv")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-report-%s.csv\"", 
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=\"%s-report-%s.csv\"",
 		reportType, time.Now().Format("2006-01-02")))
-	
+
 	// Write CSV header
 	if _, err := w.Write([]byte("ID,Email,DateAdded,Redeemed\n")); err != nil {
 		s.logger.Error("Error writing CSV header", "error", err)
 		return
 	}
-	
+
 	// Write each row
 	for _, user := range users {
 		redeemedStr := ""
 		if user.Redeemed != nil {
 			redeemedStr = user.Redeemed.Format(time.RFC3339)
 		}
-		
-		row := fmt.Sprintf("%s,%s,%s,%s\n", 
-			user.ID, 
-			user.Email, 
-			user.DateAdded.Format(time.RFC3339), 
+
+		row := fmt.Sprintf("%s,%s,%s,%s\n",
+			user.ID,
+			user.Email,
+			user.DateAdded.Format(time.RFC3339),
 			redeemedStr)
-		
+
 		if _, err := w.Write([]byte(row)); err != nil {
 			s.logger.Error("Error writing CSV row", "error", err)
 			return
@@ -402,7 +402,7 @@ func parseDateParams(r *http.Request) (time.Time, time.Time, error) {
 	// Default dates (last 7 days)
 	fromDate := time.Now().AddDate(0, 0, -7)
 	toDate := time.Now()
-	
+
 	// Parse 'from' parameter if provided
 	fromParam := r.URL.Query().Get("from")
 	if fromParam != "" {
@@ -412,7 +412,7 @@ func parseDateParams(r *http.Request) (time.Time, time.Time, error) {
 		}
 		fromDate = parsedFrom
 	}
-	
+
 	// Parse 'to' parameter if provided
 	toParam := r.URL.Query().Get("to")
 	if toParam != "" {
@@ -423,12 +423,12 @@ func parseDateParams(r *http.Request) (time.Time, time.Time, error) {
 		// Set time to end of day for inclusive range
 		toDate = parsedTo.Add(24*time.Hour - time.Second)
 	}
-	
+
 	// Validate date range
 	if fromDate.After(toDate) {
 		return time.Time{}, time.Time{}, fmt.Errorf("'from' date cannot be after 'to' date")
 	}
-	
+
 	return fromDate, toDate, nil
 }
 
@@ -445,7 +445,7 @@ func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // writeJSONResponse writes a JSON response with the given status code
-func (s *Server) writeJSONResponse(w http.ResponseWriter, data interface{}, statusCode int) {
+func (s *Server) writeJSONResponse(w http.ResponseWriter, data any, statusCode int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
 	if err := json.NewEncoder(w).Encode(data); err != nil {
@@ -505,4 +505,3 @@ func GenerateUniqueID() string {
 	now := time.Now()
 	return fmt.Sprintf("api_%d", now.UnixNano())
 }
-

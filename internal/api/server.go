@@ -1,6 +1,7 @@
 package api
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
@@ -49,6 +50,20 @@ type EmailResponse struct {
 	ID      string `json:"id,omitempty"`
 	Status  string `json:"status"`
 	Message string `json:"message,omitempty"`
+}
+
+// BulkUploadRequest represents the JSON payload for bulk email upload
+type BulkUploadRequest struct {
+	Emails []string `json:"emails,omitempty"`
+}
+
+// BulkUploadResponse represents the JSON response for bulk upload
+type BulkUploadResponse struct {
+	Total     int      `json:"total"`
+	Success   int      `json:"success"`
+	Failed    int      `json:"failed"`
+	Duplicate int      `json:"duplicate"`
+	Failures  []string `json:"failures,omitempty"`
 }
 
 // ErrorResponse represents the JSON response for errors
@@ -108,6 +123,7 @@ func New(cfg *config.Config, svc ServiceInterface, log *logger.Logger) (*Server,
 
 	// Register routes
 	mux.HandleFunc("/api/v1/email", server.handleEmail)
+	mux.HandleFunc("/api/v1/email/bulk", server.handleBulkUpload)
 	mux.HandleFunc("/api/v1/report/redeemed", server.handleReportRedeemed)
 	mux.HandleFunc("/api/v1/report/added", server.handleReportAdded)
 	mux.HandleFunc("/api/v1/report/all", server.handleReportAll)
@@ -464,6 +480,263 @@ func (s *Server) writeErrorResponse(w http.ResponseWriter, message string, statu
 	}); err != nil {
 		s.logger.Error("Error encoding JSON error response", "error", err)
 	}
+}
+
+// handleBulkUpload handles the bulk email upload endpoint
+func (s *Server) handleBulkUpload(w http.ResponseWriter, r *http.Request) {
+	// Only allow POST method
+	if r.Method != http.MethodPost {
+		s.writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed, "Only POST method is allowed")
+		return
+	}
+
+	// Authenticate request
+	apiKey := r.Header.Get("Authorization")
+	if len(apiKey) > 7 && strings.HasPrefix(strings.ToLower(apiKey), "bearer ") {
+		apiKey = apiKey[7:] // Remove 'Bearer ' prefix
+	}
+
+	if !s.authProvider.Authenticate(apiKey) {
+		s.writeErrorResponse(w, "Unauthorized", http.StatusUnauthorized, "Invalid or missing authentication token")
+		return
+	}
+
+	// Apply rate limiting
+	clientIP := getClientIP(r)
+	clientID := int64(HashCode(clientIP))
+
+	if !s.limiter.Allow(clientID) {
+		s.writeErrorResponse(w, "Too Many Requests", http.StatusTooManyRequests, "Rate limit exceeded")
+		return
+	}
+
+	// Check Content-Type and parse accordingly
+	contentType := r.Header.Get("Content-Type")
+
+	var emails []string
+	var err error
+
+	if strings.HasPrefix(contentType, "application/json") {
+		// Parse JSON payload
+		emails, err = parseBulkJSONPayload(r)
+	} else if strings.HasPrefix(contentType, "text/csv") || strings.HasPrefix(contentType, "application/csv") {
+		// Parse CSV payload
+		emails, err = parseBulkCSVPayload(r)
+	} else if strings.HasPrefix(contentType, "multipart/form-data") {
+		// Parse multipart form file upload
+		emails, err = parseMultipartFormUpload(r)
+	} else {
+		s.writeErrorResponse(w, "Invalid Content-Type", http.StatusUnsupportedMediaType,
+			"Content-Type must be application/json, text/csv, or multipart/form-data")
+		return
+	}
+
+	if err != nil {
+		s.writeErrorResponse(w, "Invalid request", http.StatusBadRequest, err.Error())
+		return
+	}
+
+	if len(emails) == 0 {
+		s.writeErrorResponse(w, "Invalid request", http.StatusBadRequest, "No valid emails found in payload")
+		return
+	}
+
+	// Enforce maximum number of emails per request
+	maxEmails := 1000 // Arbitrary limit to prevent abuse
+	if len(emails) > maxEmails {
+		s.writeErrorResponse(w, "Request too large", http.StatusRequestEntityTooLarge,
+			fmt.Sprintf("Maximum %d emails allowed per request", maxEmails))
+		return
+	}
+
+	// Process emails in bulk
+	ctx := context.Background()
+	response := processBulkEmails(ctx, s, clientID, emails)
+
+	// Return success
+	s.writeJSONResponse(w, response, http.StatusOK)
+}
+
+// processBulkEmails processes multiple emails and returns stats
+func processBulkEmails(ctx context.Context, s *Server, clientID int64, emails []string) BulkUploadResponse {
+	response := BulkUploadResponse{
+		Total:     len(emails),
+		Success:   0,
+		Failed:    0,
+		Duplicate: 0,
+		Failures:  []string{},
+	}
+
+	for _, rawEmail := range emails {
+		// Validate and normalize email
+		if !utils.IsValidEmail(rawEmail) {
+			response.Failed++
+			response.Failures = append(response.Failures, fmt.Sprintf("%s: invalid format", rawEmail))
+			continue
+		}
+
+		email := utils.NormalizeEmail(rawEmail)
+
+		// Check if email already exists
+		status, _, err := s.service.CheckEmailStatus(ctx, clientID, email)
+		if err != nil {
+			response.Failed++
+			response.Failures = append(response.Failures, fmt.Sprintf("%s: server error", email))
+			continue
+		}
+
+		// Handle based on status
+		switch status {
+		case "eligible", "redeemed":
+			response.Duplicate++
+			continue
+
+		case "rate_limited", "unavailable":
+			response.Failed++
+			response.Failures = append(response.Failures, fmt.Sprintf("%s: %s", email, status))
+			continue
+
+		case "not_found":
+			// Continue with adding the email
+		}
+
+		// Generate a new user with a unique ID
+		newUser := &domain.User{
+			ID:        GenerateUniqueID(),
+			Email:     email,
+			DateAdded: time.Now(),
+			Redeemed:  nil,
+		}
+
+		// Store in database
+		if err := s.service.AddUser(ctx, newUser); err != nil {
+			response.Failed++
+			response.Failures = append(response.Failures, fmt.Sprintf("%s: storage error", email))
+			s.logger.Error("Error adding email to database", "email", email, "error", err)
+			continue
+		}
+
+		// Increment success counter
+		response.Success++
+
+		// Log successful addition
+		s.logger.Info("Email added via bulk API", "email", email, "id", newUser.ID)
+	}
+
+	return response
+}
+
+// parseBulkJSONPayload parses JSON payload for bulk upload
+func parseBulkJSONPayload(r *http.Request) ([]string, error) {
+	var req BulkUploadRequest
+	decoder := json.NewDecoder(r.Body)
+	if err := decoder.Decode(&req); err != nil {
+		return nil, fmt.Errorf("invalid JSON payload: %v", err)
+	}
+
+	if len(req.Emails) == 0 {
+		return nil, fmt.Errorf("no emails found in JSON payload")
+	}
+
+	return req.Emails, nil
+}
+
+// parseBulkCSVPayload parses CSV payload for bulk upload
+func parseBulkCSVPayload(r *http.Request) ([]string, error) {
+	var emails []string
+
+	// Read lines from the request body
+	scanner := bufio.NewScanner(r.Body)
+	lineNum := 0
+
+	for scanner.Scan() {
+		lineNum++
+		line := strings.TrimSpace(scanner.Text())
+
+		// Skip empty lines and header row if present
+		if line == "" || (lineNum == 1 && strings.Contains(strings.ToLower(line), "email")) {
+			continue
+		}
+
+		// Handle simple CSV with one email per line
+		parts := strings.Split(line, ",")
+		email := strings.TrimSpace(parts[0])
+
+		if email != "" {
+			emails = append(emails, email)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		return nil, fmt.Errorf("error reading CSV data: %v", err)
+	}
+
+	return emails, nil
+}
+
+// parseMultipartFormUpload parses multipart form upload for bulk upload
+func parseMultipartFormUpload(r *http.Request) ([]string, error) {
+	// Parse multipart form with 10MB limit
+	if err := r.ParseMultipartForm(10 << 20); err != nil {
+		return nil, fmt.Errorf("error parsing multipart form: %v", err)
+	}
+
+	// Get the file from the form
+	file, handler, err := r.FormFile("file")
+	if err != nil {
+		return nil, fmt.Errorf("error retrieving file from form: %v", err)
+	}
+	defer file.Close()
+
+	// Check file type based on filename
+	var emails []string
+	filename := strings.ToLower(handler.Filename)
+
+	if strings.HasSuffix(filename, ".csv") {
+		// Process as CSV
+		reader := bufio.NewReader(file)
+		scanner := bufio.NewScanner(reader)
+		lineNum := 0
+
+		for scanner.Scan() {
+			lineNum++
+			line := strings.TrimSpace(scanner.Text())
+
+			// Skip empty lines and header row if present
+			if line == "" || (lineNum == 1 && strings.Contains(strings.ToLower(line), "email")) {
+				continue
+			}
+
+			// Handle simple CSV with one email per line
+			parts := strings.Split(line, ",")
+			email := strings.TrimSpace(parts[0])
+
+			if email != "" {
+				emails = append(emails, email)
+			}
+		}
+
+		if err := scanner.Err(); err != nil {
+			return nil, fmt.Errorf("error reading CSV file: %v", err)
+		}
+	} else if strings.HasSuffix(filename, ".json") {
+		// Process as JSON
+		var req BulkUploadRequest
+		decoder := json.NewDecoder(file)
+		if err := decoder.Decode(&req); err != nil {
+			return nil, fmt.Errorf("invalid JSON file: %v", err)
+		}
+
+		emails = req.Emails
+	} else {
+		return nil, fmt.Errorf("unsupported file type: must be CSV or JSON")
+	}
+
+	if len(emails) == 0 {
+		return nil, fmt.Errorf("no valid emails found in uploaded file")
+	}
+
+	return emails, nil
 }
 
 // getClientIP extracts the client IP address from the request

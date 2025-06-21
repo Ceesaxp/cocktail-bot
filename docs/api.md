@@ -164,6 +164,102 @@ Adds a new email address to the database.
 }
 ```
 
+### Bulk Upload Emails
+
+```
+POST /api/v1/email/bulk
+```
+
+Adds multiple email addresses to the database in a single request. This endpoint supports three content types:
+
+1. **JSON payload** with Content-Type: `application/json`
+2. **CSV data** with Content-Type: `text/csv` or `application/csv`
+3. **File upload** with Content-Type: `multipart/form-data` (supports both CSV and JSON files)
+
+#### JSON Request Example:
+
+```json
+{
+  "emails": [
+    "user1@example.com",
+    "user2@example.com",
+    "user3@example.com"
+  ]
+}
+```
+
+#### CSV Request Example:
+
+Simple CSV format with one email per line:
+```
+email
+user1@example.com
+user2@example.com
+user3@example.com
+```
+The first line is treated as a header if it contains the word "email" and will be skipped.
+
+#### File Upload Example:
+
+Upload a CSV or JSON file using a multipart form with the field name "file".
+
+**Successful Response (200 OK):**
+
+```json
+{
+  "total": 3,
+  "success": 2,
+  "failed": 0,
+  "duplicate": 1,
+  "failures": []
+}
+```
+
+If any emails fail validation or insertion, details are provided in the `failures` array:
+
+```json
+{
+  "total": 3,
+  "success": 1,
+  "failed": 1,
+  "duplicate": 1,
+  "failures": [
+    "invalid@email.: invalid format"
+  ]
+}
+```
+
+**Error Responses:**
+
+1. No valid emails found (400 Bad Request):
+```json
+{
+  "error": "Invalid request",
+  "code": 400,
+  "details": "No valid emails found in payload"
+}
+```
+
+2. Request too large (413 Request Entity Too Large):
+```json
+{
+  "error": "Request too large",
+  "code": 413,
+  "details": "Maximum 1000 emails allowed per request"
+}
+```
+
+3. Invalid content type (415 Unsupported Media Type):
+```json
+{
+  "error": "Invalid Content-Type",
+  "code": 415,
+  "details": "Content-Type must be application/json, text/csv, or multipart/form-data"
+}
+```
+
+The endpoint also returns the same authentication and rate limit error responses as the single email endpoint.
+
 ### Generate Reports
 
 The following endpoints allow you to generate reports about users in various formats.
@@ -293,6 +389,8 @@ The API is configured in the `config.yaml` file under the `api` section:
 api:
   # Enable or disable the REST API
   enabled: true
+  # Host to bind to (default is 0.0.0.0)
+  host: "0.0.0.0"
   # Port to listen on
   port: 8080
   # File containing authentication tokens

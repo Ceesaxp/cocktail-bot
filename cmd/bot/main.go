@@ -13,6 +13,7 @@ import (
 	"github.com/ceesaxp/cocktail-bot/internal/logger"
 	"github.com/ceesaxp/cocktail-bot/internal/service"
 	"github.com/ceesaxp/cocktail-bot/internal/telegram"
+	"github.com/ceesaxp/cocktail-bot/webui"
 )
 
 func main() {
@@ -65,6 +66,25 @@ func main() {
 		l.Info("API server started", "port", cfg.API.Port)
 	}
 
+	// Initialize and start WebUI if enabled
+	var webUIServer *webui.Server
+	if cfg.WebUI.Enabled {
+		// Ensure API is also enabled when WebUI is enabled
+		if !cfg.API.Enabled {
+			l.Fatal("WebUI requires API to be enabled")
+		}
+
+		webUIServer, err = webui.New(cfg, l)
+		if err != nil {
+			l.Fatal("Failed to initialize WebUI server", "error", err)
+		}
+
+		if err := webUIServer.Start(); err != nil {
+			l.Fatal("Failed to start WebUI server", "error", err)
+		}
+		l.Info("WebUI server started", "port", cfg.WebUI.Port)
+	}
+
 	// Wait for termination signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, syscall.SIGINT, syscall.SIGTERM)
@@ -87,6 +107,15 @@ func main() {
 			l.Error("Error stopping API server", "error", err)
 		}
 		l.Info("API server stopped")
+	}
+
+	// Stop WebUI server if running
+	if webUIServer != nil {
+		l.Info("Shutting down WebUI server")
+		if err := webUIServer.Stop(); err != nil {
+			l.Error("Error stopping WebUI server", "error", err)
+		}
+		l.Info("WebUI server stopped")
 	}
 
 	// Close service

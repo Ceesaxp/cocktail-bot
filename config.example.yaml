@@ -26,6 +26,14 @@ database:
   # SQLite:
   # type: "sqlite"
   # connection_string: "./data/users.db"
+  #
+  # For googlesheet connection string is "https://docs.google.com/spreadsheets/d/1234567890/edit#gid=0"
+  # -> https://docs.google.com/spreadsheets/d/1DttA5fdJiJTOChVewghcTMthDPoMa9Q655LxVBw0eVA/edit
+  # For csv and sqlite it is path to the csv/database file
+  # For googlesheet it is the url of the spreadsheet
+  # For postgresql it is the connection string
+  # For mysql it is the connection string
+  # For mongodb it is the connection string
 
 # Rate limiting settings
 rate_limiting:
@@ -54,3 +62,18 @@ api:
   tokens_file: "api_tokens.yaml"
   rate_limit_per_min: 30
   rate_limit_per_hour: 300
+  auth_tokens:
+    - "default_api_token_1234567890"
+    - "second_test_token_abcdefgh"
+
+webui:
+  # Enable or disable the Web UI
+  enabled: true
+  # Host to bind to
+  host: "0.0.0.0"
+  # Port to listen on (different from API port)
+  port: 8081
+  # Optional: Session secret for cookies (auto-generated if not provided)
+  # session_secret: "generate_a_random_string_here"
+  # Note: Web UI uses the same authentication tokens as the API
+  # Configure tokens in the api.auth_tokens section above

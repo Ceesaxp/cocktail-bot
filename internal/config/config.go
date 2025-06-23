@@ -23,6 +23,7 @@ type Config struct {
 	RateLimiting RateLimitConfig `yaml:"rate_limiting"`
 	Language     LanguageConfig  `yaml:"language"`
 	API          APIConfig       `yaml:"api"`
+	WebUI        WebUIConfig     `yaml:"webui"`
 }
 
 // TelegramConfig holds Telegram bot configuration
@@ -85,6 +86,14 @@ func New() *Config {
 			TokensFile:       "./api_tokens.yaml",
 			RateLimitPerMin:  30,
 			RateLimitPerHour: 300,
+		},
+		WebUI: WebUIConfig{
+			Enabled:       false,
+			Host:          "0.0.0.0",
+			Port:          8081,
+			SessionSecret: "",
+			TemplateDir:   "./webui/templates",
+			StaticDir:     "./webui/static",
 		},
 	}
 }
@@ -215,6 +224,29 @@ func loadFromEnvironment(cfg *Config) {
 			cfg.API.AuthTokens = filteredTokens
 		}
 	}
+
+	// Web UI
+	if value := os.Getenv(envPrefix + "WEBUI_ENABLED"); value != "" {
+		cfg.WebUI.Enabled = strings.ToLower(value) == "true" || value == "1"
+	}
+	if value := os.Getenv(envPrefix + "WEBUI_HOST"); value != "" {
+		cfg.WebUI.Host = value
+	}
+	if value := os.Getenv(envPrefix + "WEBUI_PORT"); value != "" {
+		if intValue, err := strconv.Atoi(value); err == nil && intValue > 0 {
+			cfg.WebUI.Port = intValue
+		}
+	}
+	if value := os.Getenv(envPrefix + "WEBUI_SESSION_SECRET"); value != "" {
+		cfg.WebUI.SessionSecret = value
+	}
+	if value := os.Getenv(envPrefix + "WEBUI_TEMPLATE_DIR"); value != "" {
+		cfg.WebUI.TemplateDir = value
+	}
+	if value := os.Getenv(envPrefix + "WEBUI_STATIC_DIR"); value != "" {
+		cfg.WebUI.StaticDir = value
+	}
+
 }
 
 // GetConfigPath returns the config file path based on the provided path or default

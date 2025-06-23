@@ -1,0 +1,175 @@
+{{define "content"}}
+<div class="row">
+    <!-- Stats Cards -->
+    <div class="col-md-3 mb-4">
+        <div class="card text-center h-100 border-primary">
+            <div class="card-header bg-primary text-white">
+                Total Users
+            </div>
+            <div class="card-body">
+                <h2 class="card-title">{{.Stats.total}}</h2>
+                <p class="card-text">Total registered users</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-center h-100 border-success">
+            <div class="card-header bg-success text-white">
+                Redeemed Cocktails
+            </div>
+            <div class="card-body">
+                <h2 class="card-title">{{.Stats.redeemed}}</h2>
+                <p class="card-text">Users who redeemed their cocktails</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-center h-100 border-info">
+            <div class="card-header bg-info text-white">
+                Last Month
+            </div>
+            <div class="card-body">
+                <h2 class="card-title">{{.Stats.last_month}}</h2>
+                <p class="card-text">New users in the last 30 days</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-3 mb-4">
+        <div class="card text-center h-100 border-warning">
+            <div class="card-header bg-warning text-dark">
+                Last Week
+            </div>
+            <div class="card-body">
+                <h2 class="card-title">{{.Stats.last_week}}</h2>
+                <p class="card-text">New users in the last 7 days</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Charts -->
+<div class="row mt-4">
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Redemption Rate
+            </div>
+            <div class="card-body">
+                <canvas id="redemptionChart"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-6 mb-4">
+        <div class="card">
+            <div class="card-header">
+                Recent Activity
+            </div>
+            <div class="card-body">
+                <canvas id="activityChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Quick Actions -->
+<div class="row mt-2">
+    <div class="col-12">
+        <div class="card">
+            <div class="card-header">
+                Quick Actions
+            </div>
+            <div class="card-body">
+                <div class="d-flex gap-2 flex-wrap">
+                    <a href="/users" class="btn btn-primary">View All Users</a>
+                    <a href="/redeemed" class="btn btn-success">View Redeemed Cocktails</a>
+                    <a href="/api/v1/report/all?format=csv" class="btn btn-secondary" target="_blank">Download Full Report (CSV)</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Redemption Rate Chart
+    const redemptionCtx = document.getElementById('redemptionChart').getContext('2d');
+    const redemptionChart = new Chart(redemptionCtx, {
+        type: 'doughnut',
+        data: {
+            labels: ['Redeemed', 'Not Redeemed'],
+            datasets: [{
+                data: [{{.Stats.redeemed}}, {{.Stats.total}} - {{.Stats.redeemed}}],
+                backgroundColor: ['#28a745', '#e9ecef'],
+                borderWidth: 1
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                title: {
+                    display: true,
+                    text: 'Cocktail Redemption Rate'
+                }
+            }
+        }
+    });
+
+    // Activity Chart (placeholder with mock data)
+    const activityCtx = document.getElementById('activityChart').getContext('2d');
+    const activityChart = new Chart(activityCtx, {
+        type: 'bar',
+        data: {
+            labels: ['Week 1', 'Week 2', 'Week 3', 'Week 4'],
+            datasets: [
+                {
+                    label: 'New Registrations',
+                    data: [
+                        Math.floor({{.Stats.last_month}} * 0.3),
+                        Math.floor({{.Stats.last_month}} * 0.2),
+                        Math.floor({{.Stats.last_month}} * 0.4),
+                        {{.Stats.last_week}}
+                    ],
+                    backgroundColor: 'rgba(13, 110, 253, 0.5)',
+                    borderColor: 'rgb(13, 110, 253)',
+                    borderWidth: 1
+                },
+                {
+                    label: 'Redemptions',
+                    data: [
+                        Math.floor({{.Stats.redeemed}} * 0.25),
+                        Math.floor({{.Stats.redeemed}} * 0.25),
+                        Math.floor({{.Stats.redeemed}} * 0.25),
+                        Math.floor({{.Stats.redeemed}} * 0.25)
+                    ],
+                    backgroundColor: 'rgba(40, 167, 69, 0.5)',
+                    borderColor: 'rgb(40, 167, 69)',
+                    borderWidth: 1
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                legend: {
+                    position: 'bottom',
+                },
+                title: {
+                    display: true,
+                    text: 'Monthly Activity'
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true
+                }
+            }
+        }
+    });
+</script>
+{{end}}
